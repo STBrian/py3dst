@@ -1,1 +1,1 @@
-from .tex3dst import *
+from .tex3dst import Texture3dst
