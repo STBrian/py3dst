@@ -253,9 +253,6 @@ class Texture3dst:
         self.height = height
         self.texheight = texheight
         self.miplevel = miplevel
-        self.convertedData = []
-        self.mipoutput = []
-        self.output = []
 
         # Establece la longitud de bytes que tiene cada pixel en cada formato
         match format:
@@ -309,6 +306,9 @@ class Texture3dst:
             case "la4":
                 self.channels = 2
 
+        # Todas las texturas vienen invertidas por defecto
+        self.flipX()
+
         return self
 
     def new(self, width: int, height: int, miplevel: int = 1, format: str = "rgba8"):
@@ -347,9 +347,6 @@ class Texture3dst:
             for j in range(texwidth):
                 data[i].append([0] * self.channels)
         self.data = data
-        self.convertedData = []
-        self.mipoutput = []
-        self.output = []
         return self
 
     def setPixelRGBA(self, x: int, y: int, pixel_data: tuple | list) -> None:
@@ -375,8 +372,6 @@ class Texture3dst:
             else:
                 raise Texture3dstException("pixel_data must be only integers.")
         self.data[y][x] = list(pixel_data)
-        self.convertedData = []
-        self.mipoutput = []
         return
 
     def getPixelData(self, x: int, y: int) -> list:
@@ -426,31 +421,25 @@ class Texture3dst:
         for i in range(y, height):
             for j in range(x, width):
                 self.setPixelRGBA(j, i, list(imgData[j, i])[::])
-        # Avoid export without convert data after a change
-        self.convertedData = []
-        self.mipoutput = []
         return
 
     def flipX(self) -> None:
         self.data.reverse()
-        self.convertedData = []
-        self.mipoutput = []
         return
 
     def flipY(self) -> None:
         for element in self.data:
             element.reverse()
-        self.convertedData = []
-        self.mipoutput = []
         return
 
     def getData(self) -> list:
         return self.data
-    
-    def getOutputData(self) -> list:
-        return self.output
 
     def convertData(self) -> None:        
+        print("[Warning] 'convertData' function is deprecated and its use is no longer necessary")
+    
+    def __formatPixelData(self) -> None:
+        # Uso interno
         self.convertedData = convertFunction(self.data, self.texwidth, self.texheight, 1)
 
         if self.miplevel > 1:
@@ -491,37 +480,40 @@ class Texture3dst:
                 height = height // 2
             mipTmpData = []
         return
-    
+
     def export(self, path: str | Path) -> None:
         if type(path) == str:
             path = Path(path)
         if not isinstance(path, Path):
             raise TypeError("Expected str or Path type for path.")
+        
+        self.flipX()
+        self.__formatPixelData()
 
         # Se crea la cabecera
         ## Marca de formato
-        self.output = bytearray(uint_to_bytes(bytes_to_uint(bytes.fromhex("33445354"), "little"), "little"))
+        output = bytearray(uint_to_bytes(bytes_to_uint(bytes.fromhex("33445354"), "little"), "little"))
         ## Modo de textura
-        self.output.extend(uint_to_bytes(self.mode, "little"))
+        output.extend(uint_to_bytes(self.mode, "little"))
         ## No sé aún pero mientras tanto xd (posiblemente es el formato)
-        self.output.extend(uint_to_bytes(self.formats.index(self.format), "little"))
+        output.extend(uint_to_bytes(self.formats.index(self.format), "little"))
 
         ## Se escriben las dimensiones de la textura
-        self.output.extend(uint_to_bytes(self.texwidth, "little"))
-        self.output.extend(uint_to_bytes(self.texheight, "little"))
+        output.extend(uint_to_bytes(self.texwidth, "little"))
+        output.extend(uint_to_bytes(self.texheight, "little"))
 
         ## Se escriben las dimensiones de la textura original
-        self.output.extend(uint_to_bytes(self.width, "little"))
-        self.output.extend(uint_to_bytes(self.height, "little"))
+        output.extend(uint_to_bytes(self.width, "little"))
+        output.extend(uint_to_bytes(self.height, "little"))
 
         ### Mip level
-        self.output.extend(uint_to_bytes(self.miplevel, "little"))
+        output.extend(uint_to_bytes(self.miplevel, "little"))
 
         ## Se copia la lista de convertedData a output - Nivel primario
         for y in self.convertedData:
             for pixel in y:
                 for channel in pixel:
-                    self.output.append(channel)
+                    output.append(channel)
         
         ## Se copian los niveles de mipoutput (si hay) - Niveles de mip
         if self.miplevel > 1:
@@ -529,10 +521,13 @@ class Texture3dst:
                 for y in nivel:
                     for pixel in y:
                         for channel in pixel:
-                            self.output.append(channel)
+                            output.append(channel)
 
         # Se escriben los bytes en un archivo
         with open(path, "wb") as f:
-            f.write(self.output)
+            f.write(output)
+
+        self.convertedData = []
+        self.mipoutput = []
         return
     
