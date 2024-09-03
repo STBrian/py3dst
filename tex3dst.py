@@ -529,5 +529,6 @@ class Texture3dst:
 
         self.convertedData = []
         self.mipoutput = []
+        self.flipX()
         return
     
