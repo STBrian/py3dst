@@ -1,10 +1,10 @@
-A Python module to edit *.3dst files from MC3DS Edition.
+Python module to read/edit 3DST textures from MC3DS Edition
 
 Supported formats:
-- rgba8
-- rgb8
-- rgba5551
-- rgb565
-- rgba4
-- la8
-- la4
+- RGBA8
+- RGB8
+- RGBA5551
+- RGB565
+- RGBA4
+- LA8
+- LA4
