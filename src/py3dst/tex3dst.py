@@ -2,177 +2,13 @@ import numpy
 from PIL import Image
 from pathlib import Path
 
-from .primitive_types import read_bytes, read_uint32
 from dataclasses import dataclass
 from typing import BinaryIO, Tuple, List, Union
 from numpy import uint32
 
+from .primitive_types import *
 from .utils import isPowerOfTwo, getClosestPowerOfTwo, maxIntBits
 from .errors import *
-
-def setPixelRGBAfromList(data: list, pos: tuple, pixel_data: tuple | list) -> list:
-        if type(data) != list:
-            raise TypeError("Data expected to be a list.")
-
-        if type(pos) != tuple:
-            raise TypeError("Position expected to be a tuple.")
-        if len(pos) == 2:
-            if not all(isinstance(num, int) for num in pos):
-                raise TypeError("Coordinates must be integers.")
-        else:
-            raise ValueError("Position must have 2 values.")
-        
-        if type(pixel_data) == list:
-            pixel_data = tuple(pixel_data)
-        if type(pixel_data) != tuple:
-            raise ValueError("Pixel_data expected to be a tuple or list.")
-        for num in pixel_data:
-            if isinstance(num, int):
-                if num < 0 or num > 255:
-                    raise Texture3dstException("Pixel_data values must be between 0 and 255.")
-            else:
-                raise Texture3dstException("Pixel_data must be only integers.")
-
-        if len(pixel_data) != len(data[pos[1]][pos[0]]):
-            raise ValueError("Pixel_data lenght does not match with original pixel")
-
-        data[pos[1]][pos[0]] = list(pixel_data)
-        return data
-
-def getPixelDataFromList(data: list, pos: tuple) -> list:
-        if type(data) != list:
-            raise Texture3dstException("data expected to be a list.")
-        
-        if type(pos) != tuple:
-            raise TypeError("Position expected to be a tuple.")
-        if len(pos) == 2:
-            if not all(isinstance(num, int) for num in pos):
-                raise TypeError("Coordinates must be integers.")
-        else:
-            raise ValueError("Position must have 2 values.")
-        return data[pos[1]][pos[0]]
-
-def convertRGBA5551toRGBA8(data: list):
-    tmpData = []
-    for i in range(len(data)):
-        tmpData.append([])
-        for j in range(len(data[i])):
-            tmpData[-1].append([])
-            byte1 = data[i][j][0]
-            byte2 = data[i][j][1]
-
-            combined = (byte2 << 8) | byte1
-
-            a = int((combined >> 0) & 0b1)
-            b = int((combined >> 1) & 0b11111)
-            g = int((combined >> 6) & 0b11111)
-            r = int((combined >> 11) & 0b11111)
-
-            a = a * 255
-            b = int((b/maxIntBits(5))*255)
-            g = int((g/maxIntBits(5))*255)
-            r = int((r/maxIntBits(5))*255)
-
-            tmpData[-1][-1].extend([a, b, g, r])
-    return tmpData
-
-def convertRGB565toRGB8(data: list):
-    tmpData = []
-    for i in range(len(data)):
-        tmpData.append([])
-        for j in range(len(data[i])):
-            tmpData[-1].append([])
-            byte1 = data[i][j][0]
-            byte2 = data[i][j][1]
-
-            combined = (byte2 << 8) | byte1
-
-            b = int((combined >> 0) & 0b11111)
-            g = int((combined >> 5) & 0b111111)
-            r = int((combined >> 11) & 0b11111)
-
-            b = int((b/maxIntBits(5))*255)
-            g = int((g/maxIntBits(6))*255)
-            r = int((r/maxIntBits(5))*255)
-
-            tmpData[-1][-1].extend([b, g, r])
-    return tmpData
-
-def convertRGBA4toRGBA8(data: list):
-    tmpData = []
-    for i in range(len(data)):
-        tmpData.append([])
-        for j in range(len(data[i])):
-            tmpData[-1].append([])
-            byte1 = data[i][j][0]
-            byte2 = data[i][j][1]
-
-            combined = (byte2 << 8) | byte1
-
-            a = int((combined >> 0) & 0b1111)
-            b = int((combined >> 4) & 0b1111)
-            g = int((combined >> 8) & 0b1111)
-            r = int((combined >> 12) & 0b1111)
-
-            a = int((a/maxIntBits(4))*255)
-            b = int((b/maxIntBits(4))*255)
-            g = int((g/maxIntBits(4))*255)
-            r = int((r/maxIntBits(4))*255)
-
-            tmpData[-1][-1].extend([a, b, g, r])
-    return tmpData
-
-def convertLA4toLA8(data: list):
-    tmpData = []
-    for i in range(len(data)):
-        tmpData.append([])
-        for j in range(len(data[i])):
-            tmpData[-1].append([])
-            byte1 = data[i][j][0]
-
-            a = int((byte1 >> 0) & 0b1111)
-            l = int((byte1 >> 4) & 0b1111)
-
-            a = int((a/maxIntBits(4))*255)
-            l = int((l/maxIntBits(4))*255)
-
-            tmpData[-1][-1].extend([a, l])
-    return tmpData
-
-def convertFunction(data: list, width: int, height: int, conversiontype: int):
-        if type(data) != list:
-            raise Texture3dstException("Data expected to be a list.")
-        if type(width) != int:
-            raise Texture3dstException("Width expected to be an integer.")
-        if type(height) != int:
-            raise Texture3dstException("Height expected to be an integer.")
-        if type(conversiontype) != int:
-            raise Texture3dstException("Conversion type must be and integer.")
-        if not (conversiontype >= 1 and conversiontype <= 2):
-            raise Texture3dstException("Conversion type must be 1 or 2.")
-        
-        channels = len(data[0][0])
-
-        convertedData = [[] for _ in range(height)]
-        for i in range(height):
-            for j in range(width):
-                convertedData[i].append([0] * channels)
-
-        # Bucle que itera siguiendo el patron de guardado visto en estas texturas
-        for x in range(width):
-            for y in range(height):
-                dstPos = ((((y >> 3) * (width >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)))
-                y2 = (dstPos//width)
-                x2 = dstPos - (y2*width)
-                if conversiontype == 1:
-                    # For convert from linear raw pixel data to 3dst texture data
-                    pixelData = getPixelDataFromList(data, (x, y))
-                    setPixelRGBAfromList(convertedData, (x2, y2), pixelData[::-1])
-                elif conversiontype == 2:
-                    # This does the opposite
-                    setPixelRGBAfromList(convertedData, (x, y), data[y2][x2][::-1])
-
-        return convertedData
 
 @dataclass
 class __headerTexture3dst:
@@ -191,19 +27,25 @@ def __readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: __headerTexture3dst
     headerDst.size[1] = read_uint32(fileBuffer) # height
     headerDst.mip_level = read_uint32(fileBuffer)
 
-def __getTexturePosition(x: int, y: int, width: int) -> Tuple[int, int]:
-    dstPos = ((((y >> 3) * (width >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)))
-    y2 = (dstPos//width)
-    x2 = dstPos - (y2*width)
-    return (x2, y2)
-
 def __isMipLevelValid(width, height, mip_level) -> bool:
     return (width / (2 ** (mip_level - 1)) >= 8) and (height / (2 ** (mip_level - 1)) >= 8)
+
+def __checkListType(obj: list | tuple, istype):
+    for element in obj:
+        if not isinstance(element, istype):
+            return False
+    return True
+
+def __checkListRange(obj: list | tuple, min: int, max: int):
+    for element in obj:
+        if element < min or element > max:
+            return False
+    return True
 
 class Texture3dst:
     header: __headerTexture3dst
     size: Tuple[int, int]
-    texture_data: List[List[int]]
+    textureData: List[List[bytes]]
     FORMATS = (("rgba8", True),
                ("rgb8", True),
                ("rgba5551", True),
@@ -224,42 +66,166 @@ class Texture3dst:
     def __getFormatInfo(self, format: int) -> dict:
         if not isinstance(format, int):
             raise TypeError(genericTypeErrorMessage("format", format, int))
+        
         if format < 0 or format >= len(self.FORMATS):
             return None
         
-        formatInfo = {}
-        formatInfo["name"] = self.FORMATS[format][0]
-        formatInfo["supported"] = self.FORMATS[format][1]
+        format_info = {}
+        format_info["name"] = self.FORMATS[format][0]
+        format_info["supported"] = self.FORMATS[format][1]
         match format:
             case 0: # rgba8
-                formatInfo["pixel_lenght"] = 4
-                formatInfo["pixel_channels"] = 4
+                format_info["pixel_lenght"] = 4
+                format_info["pixel_channels"] = 4
             case 1: # rgb8
-                formatInfo["pixel_lenght"] = 3
-                formatInfo["pixel_channels"] = 3
+                format_info["pixel_lenght"] = 3
+                format_info["pixel_channels"] = 3
             case 2: # rgba5551
-                formatInfo["pixel_lenght"] = 2
-                formatInfo["pixel_channels"] = 4
+                format_info["pixel_lenght"] = 2
+                format_info["pixel_channels"] = 4
             case 3: # rgb565
-                formatInfo["pixel_lenght"] = 2
-                formatInfo["pixel_channels"] = 3
+                format_info["pixel_lenght"] = 2
+                format_info["pixel_channels"] = 3
             case 4: # rgba4
-                formatInfo["pixel_lenght"] = 2
-                formatInfo["pixel_channels"] = 4
+                format_info["pixel_lenght"] = 2
+                format_info["pixel_channels"] = 4
             case 5: # la8
-                formatInfo["pixel_lenght"] = 2
-                formatInfo["pixel_channels"] = 2
+                format_info["pixel_lenght"] = 2
+                format_info["pixel_channels"] = 2
             case 9: # la4
-                formatInfo["pixel_lenght"] = 1
-                formatInfo["pixel_channels"] = 2
+                format_info["pixel_lenght"] = 1
+                format_info["pixel_channels"] = 2
 
-        return formatInfo
+        return format_info
+
+    def __getTexturePosition(self, x: int, y: int) -> Tuple[int, int]:
+        dst_pos = ((((y >> 3) * (self.header.full_size[0] >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)))
+        y2 = (dst_pos//self.header.full_size[0])
+        x2 = dst_pos - (y2*self.header.full_size[0])
+        return (x2, y2)
+
+    def __convertPixelDataToBytes(self, format: int, pixel_data: List[int] | Tuple[int]) -> bytes:
+        if not isinstance(format, int):
+            raise TypeError(genericTypeErrorMessage("format", format, int))
+        if not isinstance(pixel_data, list) and not isinstance(pixel_data, tuple):
+            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
+        
+        # Validate values
+        if format < 0 or format >= len(self.FORMATS):
+            raise ValueError(f"Unexpected 'format' value: {format}")
+        
+        format_info = self.__getFormatInfo(format)
+        if not format_info["supported"]:
+            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
+        
+        if not __checkListType(pixel_data, int):
+            raise TypeError("'pixel_data' must only contain int values")
+        
+        if len(pixel_data) > format_info["pixel_channels"]:
+            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+        elif len(pixel_data) < format_info["pixel_channels"]:
+            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+        
+        if not __checkListRange(pixel_data, 0, 255):
+            raise ValueError("'pixel_data' values must be between 0 to 255")
+
+        match format:
+            case 0: # rgba8
+                r = pixel_data[0]
+                g = pixel_data[1]
+                b = pixel_data[2]
+                a = pixel_data[3]
+                combined = (r << 24) | (g << 16) | (b << 8) | a
+            case 1: # rgb8
+                r = pixel_data[0]
+                g = pixel_data[1]
+                b = pixel_data[2]
+                combined = (r << 16) | (g << 8) | b
+            case 2: # rgba5551
+                r = int(pixel_data[0] / 0xFF * maxIntBits(5))
+                g = int(pixel_data[1] / 0xFF * maxIntBits(5))
+                b = int(pixel_data[2] / 0xFF * maxIntBits(5))
+                a = 1 if pixel_data[3] > 127 else 0
+                combined = (r << 11) | (g << 6) | (b << 1) | a
+            case 3: # rgb565
+                r = int(pixel_data[0] / 0xFF * maxIntBits(5))
+                g = int(pixel_data[1] / 0xFF * maxIntBits(6))
+                b = int(pixel_data[2] / 0xFF * maxIntBits(5))
+                combined = (r << 11) | (g << 5) | b
+            case 4: # rgba4
+                r = int(pixel_data[0] / 0xFF * maxIntBits(4))
+                g = int(pixel_data[1] / 0xFF * maxIntBits(4))
+                b = int(pixel_data[2] / 0xFF * maxIntBits(4))
+                a = int(pixel_data[3] / 0xFF * maxIntBits(4))
+                combined = (r << 12) | (g << 8) | (b << 4) | a
+            case 5: # la8
+                l = pixel_data[0]
+                a = pixel_data[1]
+                combined = (l << 8) | a
+            case 9: # la4
+                l = int((pixel_data[0] / 0xFF) * maxIntBits(4))
+                a = int((pixel_data[1] / 0xFF) * maxIntBits(4))
+                combined = (l << 4) | a
+        return combined.to_bytes(format_info["pixel_lenght"], "little", signed=False)
+
+    def __convertBytesToPixelData(self, format: int, pixel_bytes: bytes) -> Tuple[int]:
+        if not isinstance(format, int):
+            raise TypeError(genericTypeErrorMessage("format", format, int))
+        if not isinstance(pixel_bytes, bytes):
+            raise TypeError(genericTypeErrorMessage("pixel_bytes", pixel_bytes, bytes))
+        
+        # Validate values
+        if format < 0 or format >= len(self.FORMATS):
+            raise ValueError(f"Unexpected 'format' value: {format}")
+        
+        format_info = self.__getFormatInfo(format)
+        if not format_info["supported"]:
+            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
+        
+        pixel_value = int.from_bytes(pixel_bytes, "little", signed=False)
+
+        match format:
+            case 0: # rgba8
+                r = (pixel_value >> 24) & 0xFF
+                g = (pixel_value >> 16) & 0xFF
+                b = (pixel_value >> 8) & 0xFF
+                a = pixel_value & 0xFF
+                combined = (r, g, b, a)
+            case 1: # rgb8
+                r = (pixel_value >> 16) & 0xFF
+                g = (pixel_value >> 8) & 0xFF
+                b = pixel_value & 0xFF
+                combined = (r, g, b)
+            case 2: # rgba5551
+                r = int(((pixel_value >> 11) & 0b11111) / maxIntBits(5) * 0xFF)
+                g = int(((pixel_value >> 6) & 0b11111) / maxIntBits(5) * 0xFF)
+                b = int(((pixel_value >> 1) & 0b11111) / maxIntBits(5) * 0xFF)
+                a = (pixel_value & 0b1) * 0xFF
+                combined = (r, g, b, a)
+            case 3: # rgb565
+                r = int(((pixel_value >> 11) & 0b11111) / maxIntBits(5) * 0xFF)
+                g = int(((pixel_value >> 5) & 0b111111) / maxIntBits(6) * 0xFF)
+                b = int((pixel_value & 0b11111) / maxIntBits(5) * 0xFF)
+                combined = (r, g, b)
+            case 4: # rgba4
+                r = int(((pixel_value >> 12) & 0xF) / 0xF * 0xFF)
+                g = int(((pixel_value >> 8) & 0xF) / 0xF * 0xFF)
+                b = int(((pixel_value >> 4) & 0xF) / 0xF * 0xFF)
+                a = int((pixel_value & 0xF) / 0xF * 0xFF)
+                combined = (r, g, b, a)
+            case 5: # la8
+                l = (pixel_value >> 8) & 0xFF
+                a = pixel_value & 0xFF
+                combined = (l, a)
+            case 9: # la4
+                l = int(((pixel_value >> 4) & 0xF) / 0xF * 0xFF)
+                a = int((pixel_value & 0xF) / 0xF * 0xFF)
+                combined = (l, a)
+        return combined
 
     def open(self, path: str | Path):
         # Validate types
-        if isinstance(path, str):
-            path = Path(path)
-        if not isinstance(path, Path):
+        if  not isinstance(path, str) and not isinstance(path, Path):
             raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
         
         # File from the texture will be loaded
@@ -301,24 +267,24 @@ class Texture3dst:
             raise Texture3dstException("Mip level' value greater than supported")
 
         # Save size
-        self.size: Tuple[int, int] = (int(self.header.size[0]), int(self.header.size[1]))
+        self.size = (int(self.header.size[0]), int(self.header.size[1]))
 
         # Creates empty structure for pixel data
-        self.texture_data = [[] for _ in range(self.size[1])]
-        for element in self.texture_data:
-            for _ in range(self.size[0]):
-                element.append([0])
+        self.textureData = [[] for _ in range(self.header.full_size[1])]
+        for element in self.textureData:
+            for _ in range(self.header.full_size[0]):
+                element.append(bytes([0]))
         
         # Storage pixel data in place
-        for i in range(self.size[1]):
-            for j in range(self.size[0]):
-                pixel_read = list(read_bytes(textureFileBuffer, format_info["pixel_lenght"]))[::-1] # Pixel data is reversed
-                dst_pos = __getTexturePosition(j, i, self.size[0])
-                self.texture_data[dst_pos[1]][dst_pos[0]] = pixel_read
+        for i in range(self.header.full_size[1]):
+            for j in range(self.header.full_size[0]):
+                pixel_read = read_bytes(textureFileBuffer, format_info["pixel_lenght"])
+                dst_pos = self.__getTexturePosition(j, i)
+                self.textureData[dst_pos[1]][dst_pos[0]] = pixel_read
 
         textureFileBuffer.close()
         # All textures are upside down by default
-        self.flipX()
+        self.flipVertical()
         return self
 
     def new(self, width: int, height: int, mip_level: int = 1, format: str = "rgba8"):
@@ -364,195 +330,225 @@ class Texture3dst:
         self.header.size[1] = height
         self.header.mip_level = mip_level
 
-        self.size: Tuple[int, int] = (width, height)
+        self.size = (width, height)
 
         # Creates empty structure for pixel data
-        self.texture_data = [[] for _ in range(self.size[1])]
-        for element in self.texture_data:
-            for _ in range(self.size[0]):
-                element.append([0])
+        self.textureData = [[] for _ in range(self.header.full_size[1])]
+        for element in self.textureData:
+            for _ in range(self.header.full_size[0]):
+                element.append(bytes([0]))
         return self
 
-    def setPixelRGBA(self, x: int, y: int, pixel_data: tuple | list) -> None:
-        if type(x) != int:
+    def setPixel(self, x: int, y: int, pixel_data: Tuple[int] | List[int]) -> None:
+        if not isinstance(x, int):
             raise TypeError(genericTypeErrorMessage("x", x, int))
-        if type(y) != int:
+        if not isinstance(y, int):
             raise TypeError(genericTypeErrorMessage("y", y, int))
+        if not isinstance(pixel_data, tuple) and not isinstance(pixel_data, list):
+            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
+        for num in pixel_data:
+            if not isinstance(num, int):
+                raise ValueError("'pixel_data' values must be only int types")
+        
+        # Validate values
         if x < 0 or x >= self.size[0]:
             raise ValueError("x coordinates out of range")
         if y < 0 or y >= self.size[1]:
             raise ValueError("y coordinates out of range")
         
-        if isinstance(pixel_data, list):
-            pixel_data = tuple(pixel_data)
-        if not isinstance(pixel_data, tuple):
-            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
-        if len(pixel_data) != self.channels:
-            raise Texture3dstException("pixel_data lenght does not match with texture channels")
+        format = self.header.format
+        format_info = self.__getFormatInfo(format)
+        if len(pixel_data) > format_info["pixel_channels"]:
+            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+        elif len(pixel_data) < format_info["pixel_channels"]:
+            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+        
         for num in pixel_data:
-            if isinstance(num, int):
-                if num < 0 or num > 255:
-                    raise Texture3dstException("pixel_data values must be between 0 and 255.")
-            else:
-                raise Texture3dstException("pixel_data must be only integers.")
-        self.data[y][x] = list(pixel_data)
+            if num < 0 or num > 255:
+                raise ValueError("'pixel_data' values must be between 0 and 255")        
+        
+        self.textureData[y][x] = self.__convertPixelDataToBytes(format, pixel_data)
         return
 
-    def getPixelData(self, x: int, y: int) -> list:
-        if type(x) != int:
-            raise Texture3dstException("x coordinates expected to be an integer.")
-        if type(y) != int:
-            raise Texture3dstException("y coordinates expected to be an integer.")
-        if x < 0 or x >= self.width:
-            raise Texture3dstException("x coordinates out of range.")
-        if y < 0 or y >= self.height:
-            raise Texture3dstException("y coordinates out of range.")
-        return self.data[y][x]
+    def getPixel(self, x: int, y: int) -> Tuple[int]:
+        if not isinstance(x, int):
+            raise TypeError(genericTypeErrorMessage("x", x, int))
+        if not isinstance(y, int):
+            raise TypeError(genericTypeErrorMessage("y", y, int))
+
+        # Validate values
+        if x < 0 or x >= self.size[0]:
+            raise ValueError("x coordinates out of range")
+        if y < 0 or y >= self.size[1]:
+            raise ValueError("y coordinates out of range")
+        
+        format = self.header.format
+        return self.__convertBytesToPixelData(format, self.textureData[y][x])
     
     def copy(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
-        if not (x1 >= 0 and x1 <= self.width):
-            raise Texture3dstException("x1 coordinates out of range")
-        if not (x2 >= 0 and x2 <= self.width and x2 >= x1):
-            raise Texture3dstException("x2 coordinates out of range or invalid value")
-        if not (y1 >= 0 and y1 <= self.height):
-            raise Texture3dstException("y1 coordinates out of range")
-        if not (y2 >= 0 and y2 <= self.height and y2 >= y1):
-            raise Texture3dstException("y2 coordinates out of range or invalid value")
-        copyData = [[] for _ in  range(y2 - y1)]
+        if not isinstance(x1, int):
+            raise TypeError(genericTypeErrorMessage("x1", x1, int))
+        if not isinstance(y1, int):
+            raise TypeError(genericTypeErrorMessage("y1", y1, int))
+        if not isinstance(x2, int):
+            raise TypeError(genericTypeErrorMessage("x2", x2, int))
+        if not isinstance(y2, int):
+            raise TypeError(genericTypeErrorMessage("y2", y2, int))
+        
+        # Validate values
+        if x1 < 0 or x1 >= self.size[0]:
+            raise ValueError("x1 coordinates out of range")
+        if x2 < 0 or x2 >= self.size[0]:
+            raise ValueError("x2 coordinates out of range")
+        elif x2 < x1:
+            raise ValueError("x2 coordinates must be greater than x1")
+        
+        if y1 < 0 and y1 >= self.size[1]:
+            raise ValueError("y1 coordinates out of range")
+        if y2 < 0 and y2 >= self.size[1]:
+            raise ValueError("y2 coordinates out of range")
+        elif y2 < y1:
+            raise ValueError("y2 coordinates must be greater than y1")
+        
+        copy_data = [[] for _ in  range(y2 - y1)]
         for i in range(y1, y2):
             for j in range(x1, x2):
-                copyData[i - y1].append(self.data[i][j])
-        buffer = numpy.asarray(copyData, dtype=numpy.uint8)
-        return Image.fromarray(buffer)
+                copy_data[i - y1].append(self.getPixel(j, i))
+        data_buffer = numpy.asarray(copy_data, dtype=numpy.uint8)
+        return Image.fromarray(data_buffer)
 
     def fromImage(self, image: Image.Image):
         img_w, img_h = image.size
-        texture = self.new(img_w, img_h, 1)
-        texture.paste(image, 0, 0)
+        self.new(img_w, img_h, 1)
+        self.paste(image, 0, 0)
         return self
 
     def paste(self, image: Image.Image, x: int, y: int) -> None:
-        if self.format == "rgba8" or self.format == "rgba5551":
-            tformat = "RGBA"
-        elif self.format == "rgb8":
-            tformat = "RGB"
-        width = image.size[0]
-        height = image.size[1]
-        if width > self.width or height > self.height:
-            raise Texture3dstException("Source image is bigger than destination texture")
-        imageRgba = image.convert(tformat)
-        imgData = imageRgba.load()
-        for i in range(y, height):
-            for j in range(x, width):
-                self.setPixelRGBA(j, i, list(imgData[j, i])[::])
+        if not isinstance(image, Image.Image):
+            raise TypeError(genericTypeErrorMessage("image", image, Image.Image))
+        if not isinstance(x, int):
+            raise TypeError(genericTypeErrorMessage("x", x, int))
+        if not isinstance(y, int):
+            raise TypeError(genericTypeErrorMessage("y", y, int))
+        
+        img_width = image.size[0]
+        img_height = image.size[1]
+        if img_width > x + self.size[0] or img_height > y + self.size[1]:
+            raise Texture3dstException("Not enough space to paste image")
+        
+        match self.header.format:
+            case 0 | 2 | 4: # rgba8 | rgba5551 | rgba4
+                new_image = image.convert("RGBA")
+            case 1 | 3: # rgb8 | rgb565
+                new_image = image.convert("RGB")
+            case 5 | 9: # la8 | la4
+                new_image = image.convert("LA")
+            case _:
+                raise ValueError("Texture 'format' value invalid")
+        
+        for i in range(y, img_height):
+            for j in range(x, img_width):
+                self.setPixel(j, i, new_image.getpixel((j, i)))
         return
 
-    def flipX(self) -> None:
-        self.data.reverse()
+    def flipVertical(self) -> None:
+        self.textureData.reverse()
         return
 
-    def flipY(self) -> None:
-        for element in self.data:
+    def flipHorizontal(self) -> None:
+        for element in self.textureData:
             element.reverse()
         return
 
-    def getData(self) -> list:
-        return self.data
-
-    def convertData(self) -> None:        
-        print("[Warning] 'convertData' function is deprecated and its use is no longer necessary")
+    def getData(self) -> List[List[Tuple[int]]]:
+        copy_data = [[] for _ in  range(self.size[1])]
+        for i in range(self.size[1]):
+            for j in range(self.size[0]):
+                copy_data[i].append(self.getPixel(j, i))
+        return copy_data
     
-    def __formatPixelData(self) -> None:
-        # Uso interno
-        self.convertedData = convertFunction(self.data, self.texwidth, self.texheight, 1)
+    def __formatPixelData(self) -> bytearray:
+        # Rearrange pixels and saves them in data
+        data = bytearray()
+        for i in range(self.header.full_size[1]):
+            for j in range(self.header.full_size[0]):
+                dst_pos = self.__getTexturePosition(j, i)
+                data.extend(self.textureData[dst_pos[1]][dst_pos[0]])
 
-        if self.miplevel > 1:
-            self.mipoutput = []
-            width = self.texwidth
-            height = self.texheight
-            resizedwidth = self.texwidth
-            resizedheight = self.texheight
+        # In case of mipmaps
+        if self.header.mip_level > 1:
+            width = self.header.full_size[0]
+            height = self.header.full_size[1]
+            resized_width = width
+            resized_height = height
 
-            # Copia la información de data a una imagen temporal
-            tmpImage = Image.new("RGBA", (width, height))
-            tmpImagePixels = tmpImage.load()
-            for y in range(0, height):
-                for x in range(0, width):
-                    pixelData = getPixelDataFromList(self.data, (x, y))
-                    tmpImagePixels[x, y] = tuple(pixelData)
+            # Copy pixel data to a new image
+            match self.header.format:
+                case 0 | 2 | 4: # rgba8 | rgba5551 | rgba4
+                    image_tmp = Image.new("RGBA", (width, height))
+                case 1 | 3: # rgb8 | rgb565
+                    image_tmp = Image.new("RGB", (width, height))
+                case 5 | 9: # la8 | la4
+                    image_tmp = Image.new("LA", (width, height))
+                case _:
+                    raise ValueError("Texture 'format' value invalid")
+                
+            image_tmp_data = image_tmp.load()
+            for i in range(0, height):
+                for j in range(0, width):
+                    pixel_data = self.getPixel(j, i)
+                    image_tmp_data[j, i] = pixel_data
 
-            self.mipoutput = [[] for _ in range(self.miplevel - 1)]
-            for i in range(0, self.miplevel - 1):
-                # Se reescala la imagen
-                resizedwidth = resizedwidth // 2
-                resizedheight = resizedheight // 2
-                tmpImage = tmpImage.resize((resizedwidth, resizedheight), Image.Resampling.LANCZOS)
+            for i in range(self.header.mip_level - 1):
+                # Resizes image at half
+                resized_width = resized_width // 2
+                resized_height = resized_height // 2
+                image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
+                
+                # Copies full data to output
+                for j in range(self.header.full_size[1]):
+                    for k in range(self.header.full_size[0]):
+                        dst_pos = self.__getTexturePosition(k, j)
+                        pixel_data = image_tmp.getpixel((dst_pos[0], dst_pos[1]))
+                        data.extend(self.__convertPixelDataToBytes(self.header.format, pixel_data))
 
-                # Se obtiene los datos de la imagen reescalada
-                mipTmpData = [[] for _ in range(resizedheight)]
-                for y in range(0, resizedheight):
-                    for x in range(0, resizedwidth):
-                        mipTmpData[y].append([])
-                        pixelData = tmpImage.getpixel((x, y))
-                        mipTmpData[y][x] = pixelData[:]
-
-                # Se convierte los datos usando la funcion
-                self.mipoutput[i] = convertFunction(mipTmpData, resizedwidth, resizedheight, 1)
-
-                # Se reducen las dimensiones en caso de usarse de nuevo
-                width = width // 2
-                height = height // 2
-            mipTmpData = []
-        return
+                if (self.header.mip_level - 1 - i > 1):
+                    width = width // 2
+                    height = height // 2
+        return data
 
     def export(self, path: str | Path) -> None:
-        if type(path) == str:
-            path = Path(path)
-        if not isinstance(path, Path):
-            raise TypeError("Expected str or Path type for path.")
+        if not isinstance(path, str) and not isinstance(path, Path):
+            raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
         
-        self.flipX()
-        self.__formatPixelData()
-        self.flipX()
+        # Process pixel data
+        self.flipVertical()
+        data = self.__formatPixelData()
+        self.flipVertical()
 
-        # Se crea la cabecera
-        ## Marca de formato
-        output = bytearray(uint_to_bytes(bytes_to_uint(bytes.fromhex("33445354"), "little"), "little"))
-        ## Modo de textura
-        output.extend(uint_to_bytes(self.mode, "little"))
-        ## No sé aún pero mientras tanto xd (posiblemente es el formato)
-        output.extend(uint_to_bytes(self.formats.index(self.format), "little"))
+        textureFileBuffer = open(path, "wb")
 
-        ## Se escriben las dimensiones de la textura
-        output.extend(uint_to_bytes(self.texwidth, "little"))
-        output.extend(uint_to_bytes(self.texheight, "little"))
+        # Create header
+        ## File signature
+        textureFileBuffer.write(b'3DST')
+        ## Texture mode
+        write_uint32(textureFileBuffer, self.header.mode)
+        ## Texture format
+        write_uint32(textureFileBuffer, self.header.format)
 
-        ## Se escriben las dimensiones de la textura original
-        output.extend(uint_to_bytes(self.width, "little"))
-        output.extend(uint_to_bytes(self.height, "little"))
+        ## Texture real full size
+        write_uint32(textureFileBuffer, self.header.full_size[0])
+        write_uint32(textureFileBuffer, self.header.full_size[1])
+
+        ## Texture size
+        write_uint32(textureFileBuffer, self.size[0])
+        write_uint32(textureFileBuffer, self.size[1])
 
         ### Mip level
-        output.extend(uint_to_bytes(self.miplevel, "little"))
+        write_uint32(textureFileBuffer, self.header.mip_level)
 
-        ## Se copia la lista de convertedData a output - Nivel primario
-        for y in self.convertedData:
-            for pixel in y:
-                for channel in pixel:
-                    output.append(channel)
+        ## Writes all pixel data
+        textureFileBuffer.write(data)
         
-        ## Se copian los niveles de mipoutput (si hay) - Niveles de mip
-        if self.miplevel > 1:
-            for nivel in self.mipoutput:
-                for y in nivel:
-                    for pixel in y:
-                        for channel in pixel:
-                            output.append(channel)
-
-        # Se escriben los bytes en un archivo
-        with open(path, "wb") as f:
-            f.write(output)
-
-        self.convertedData = []
-        self.mipoutput = []
+        textureFileBuffer.close()
         return
-    
