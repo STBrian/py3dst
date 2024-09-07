@@ -375,18 +375,18 @@ class Texture3dst:
 
     def setPixelRGBA(self, x: int, y: int, pixel_data: tuple | list) -> None:
         if type(x) != int:
-            raise ValueError(genericTypeErrorMessage("x", x, int))
+            raise TypeError(genericTypeErrorMessage("x", x, int))
         if type(y) != int:
-            raise ValueError(genericTypeErrorMessage("y", y, int))
+            raise TypeError(genericTypeErrorMessage("y", y, int))
         if x < 0 or x >= self.size[0]:
             raise ValueError("x coordinates out of range")
         if y < 0 or y >= self.size[1]:
             raise ValueError("y coordinates out of range")
         
-        if type(pixel_data) == list:
+        if isinstance(pixel_data, list):
             pixel_data = tuple(pixel_data)
-        if type(pixel_data) != tuple:
-            raise Texture3dstException("pixel_data expected to be a tuple or list.")
+        if not isinstance(pixel_data, tuple):
+            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
         if len(pixel_data) != self.channels:
             raise Texture3dstException("pixel_data lenght does not match with texture channels")
         for num in pixel_data:
