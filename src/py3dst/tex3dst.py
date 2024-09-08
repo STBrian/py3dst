@@ -2,23 +2,22 @@ import numpy
 from PIL import Image
 from pathlib import Path
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import BinaryIO, Tuple, List, Union
-from numpy import uint32
 
 from .primitive_types import *
 from .utils import isPowerOfTwo, getClosestPowerOfTwo, maxIntBits
 from .errors import *
 
 @dataclass
-class __headerTexture3dst:
-    mode: uint32 = None
-    format: uint32 = None
-    full_size: Tuple[uint32, uint32] = None # Texture real full size
-    size: Tuple[uint32, uint32] = None # Texture size
-    mip_level: uint32 = None
+class _headerTexture3dst:
+    mode: int = 0
+    format: int = 0
+    full_size: List[int] = field(default_factory=lambda: [0, 0]) # Texture real full size
+    size: List[int] = field(default_factory=lambda: [0, 0]) # Texture size
+    mip_level: int = 0
 
-def __readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: __headerTexture3dst):
+def _readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: _headerTexture3dst):
     headerDst.mode = read_uint32(fileBuffer)
     headerDst.format = read_uint32(fileBuffer)
     headerDst.full_size[0] = read_uint32(fileBuffer) # real full width
@@ -27,24 +26,24 @@ def __readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: __headerTexture3dst
     headerDst.size[1] = read_uint32(fileBuffer) # height
     headerDst.mip_level = read_uint32(fileBuffer)
 
-def __isMipLevelValid(width, height, mip_level) -> bool:
+def _isMipLevelValid(width, height, mip_level) -> bool:
     return (width / (2 ** (mip_level - 1)) >= 8) and (height / (2 ** (mip_level - 1)) >= 8)
 
-def __checkListType(obj: list | tuple, istype):
+def _checkListType(obj: list | tuple, istype):
     for element in obj:
         if not isinstance(element, istype):
             return False
     return True
 
-def __checkListRange(obj: list | tuple, min: int, max: int):
+def _checkListRange(obj: list | tuple, min: int, max: int):
     for element in obj:
         if element < min or element > max:
             return False
     return True
 
 class Texture3dst:
-    header: __headerTexture3dst
-    size: Tuple[int, int]
+    header: _headerTexture3dst
+    size: List[int]
     textureData: List[List[bytes]]
     FORMATS = (("rgba8", True),
                ("rgb8", True),
@@ -57,13 +56,13 @@ class Texture3dst:
                ("a8", False),
                ("la4", True))
 
-    def __matchFormat(self, format: str) -> int:
+    def _matchFormat(self, format: str) -> int:
         for i, value in enumerate(self.FORMATS):
             if value[0] == format:
                 return i
         return None
     
-    def __getFormatInfo(self, format: int) -> dict:
+    def _getFormatInfo(self, format: int) -> dict:
         if not isinstance(format, int):
             raise TypeError(genericTypeErrorMessage("format", format, int))
         
@@ -98,13 +97,13 @@ class Texture3dst:
 
         return format_info
 
-    def __getTexturePosition(self, x: int, y: int) -> Tuple[int, int]:
+    def _getTexturePosition(self, x: int, y: int) -> Tuple[int]:
         dst_pos = ((((y >> 3) * (self.header.full_size[0] >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)))
         y2 = (dst_pos//self.header.full_size[0])
         x2 = dst_pos - (y2*self.header.full_size[0])
         return (x2, y2)
 
-    def __convertPixelDataToBytes(self, format: int, pixel_data: List[int] | Tuple[int]) -> bytes:
+    def _convertPixelDataToBytes(self, format: int, pixel_data: List[int] | Tuple[int]) -> bytes:
         if not isinstance(format, int):
             raise TypeError(genericTypeErrorMessage("format", format, int))
         if not isinstance(pixel_data, list) and not isinstance(pixel_data, tuple):
@@ -114,11 +113,11 @@ class Texture3dst:
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
-        format_info = self.__getFormatInfo(format)
+        format_info = self._getFormatInfo(format)
         if not format_info["supported"]:
             raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
         
-        if not __checkListType(pixel_data, int):
+        if not _checkListType(pixel_data, int):
             raise TypeError("'pixel_data' must only contain int values")
         
         if len(pixel_data) > format_info["pixel_channels"]:
@@ -126,7 +125,7 @@ class Texture3dst:
         elif len(pixel_data) < format_info["pixel_channels"]:
             raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
         
-        if not __checkListRange(pixel_data, 0, 255):
+        if not _checkListRange(pixel_data, 0, 255):
             raise ValueError("'pixel_data' values must be between 0 to 255")
 
         match format:
@@ -168,7 +167,7 @@ class Texture3dst:
                 combined = (l << 4) | a
         return combined.to_bytes(format_info["pixel_lenght"], "little", signed=False)
 
-    def __convertBytesToPixelData(self, format: int, pixel_bytes: bytes) -> Tuple[int]:
+    def _convertBytesToPixelData(self, format: int, pixel_bytes: bytes) -> Tuple[int]:
         if not isinstance(format, int):
             raise TypeError(genericTypeErrorMessage("format", format, int))
         if not isinstance(pixel_bytes, bytes):
@@ -178,7 +177,7 @@ class Texture3dst:
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
-        format_info = self.__getFormatInfo(format)
+        format_info = self._getFormatInfo(format)
         if not format_info["supported"]:
             raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
         
@@ -236,8 +235,8 @@ class Texture3dst:
             raise Texture3dstException("Texture does not contain file signature")
         
         # Header of the file
-        self.header = __headerTexture3dst()
-        __readTexture3dstHeader(textureFileBuffer, self.header)
+        self.header = _headerTexture3dst()
+        _readTexture3dstHeader(textureFileBuffer, self.header)
         
         # Only mode 3 is supported
         if self.header.mode != 3:
@@ -245,7 +244,7 @@ class Texture3dst:
         
         # Get format info and support
         format = self.header.format
-        format_info = self.__getFormatInfo(format)
+        format_info = self._getFormatInfo(format)
         if format_info == None:
             raise Texture3dstUnsupported(f"Texture format unsupported: {format}")
         elif not format_info["supported"]:
@@ -263,7 +262,7 @@ class Texture3dst:
         mip_level = self.header.mip_level
         if mip_level <= 0:
             raise ValueError("Mip level must be greater than 0")
-        if not __isMipLevelValid(full_width, full_height, mip_level):
+        if not _isMipLevelValid(full_width, full_height, mip_level):
             raise Texture3dstException("Mip level' value greater than supported")
 
         # Save size
@@ -279,7 +278,7 @@ class Texture3dst:
         for i in range(self.header.full_size[1]):
             for j in range(self.header.full_size[0]):
                 pixel_read = read_bytes(textureFileBuffer, format_info["pixel_lenght"])
-                dst_pos = self.__getTexturePosition(j, i)
+                dst_pos = self._getTexturePosition(j, i)
                 self.textureData[dst_pos[1]][dst_pos[0]] = pixel_read
 
         textureFileBuffer.close()
@@ -309,19 +308,19 @@ class Texture3dst:
         # Verify mip level
         if mip_level <= 0:
             raise ValueError("'mip_level' must be greater than 0")
-        if not __isMipLevelValid(full_width, full_height, mip_level):
+        if not _isMipLevelValid(full_width, full_height, mip_level):
             raise Texture3dstException("'mip_level' value greater than supported")
         
         # Verify format and support
-        format_match = self.__matchFormat(format)
+        format_match = self._matchFormat(format)
         if format_match:
-            format_info = self.__getFormatInfo(format_match)
+            format_info = self._getFormatInfo(format_match)
             if not format_info["supported"]:
                 raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info["name"]}'")
         else:
             raise ValueError(f"Texture format invalid: {format}")
         
-        self.header = __headerTexture3dst()
+        self.header = _headerTexture3dst()
         self.header.mode = 3
         self.header.format = format_match
         self.header.full_size[0] = full_width
@@ -357,7 +356,7 @@ class Texture3dst:
             raise ValueError("y coordinates out of range")
         
         format = self.header.format
-        format_info = self.__getFormatInfo(format)
+        format_info = self._getFormatInfo(format)
         if len(pixel_data) > format_info["pixel_channels"]:
             raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
         elif len(pixel_data) < format_info["pixel_channels"]:
@@ -367,7 +366,7 @@ class Texture3dst:
             if num < 0 or num > 255:
                 raise ValueError("'pixel_data' values must be between 0 and 255")        
         
-        self.textureData[y][x] = self.__convertPixelDataToBytes(format, pixel_data)
+        self.textureData[y][x] = self._convertPixelDataToBytes(format, pixel_data)
         return
 
     def getPixel(self, x: int, y: int) -> Tuple[int]:
@@ -383,7 +382,7 @@ class Texture3dst:
             raise ValueError("y coordinates out of range")
         
         format = self.header.format
-        return self.__convertBytesToPixelData(format, self.textureData[y][x])
+        return self._convertBytesToPixelData(format, self.textureData[y][x])
     
     def copy(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
         if not isinstance(x1, int):
@@ -467,12 +466,12 @@ class Texture3dst:
                 copy_data[i].append(self.getPixel(j, i))
         return copy_data
     
-    def __formatPixelData(self) -> bytearray:
+    def _formatPixelData(self) -> bytearray:
         # Rearrange pixels and saves them in data
         data = bytearray()
         for i in range(self.header.full_size[1]):
             for j in range(self.header.full_size[0]):
-                dst_pos = self.__getTexturePosition(j, i)
+                dst_pos = self._getTexturePosition(j, i)
                 data.extend(self.textureData[dst_pos[1]][dst_pos[0]])
 
         # In case of mipmaps
@@ -508,9 +507,9 @@ class Texture3dst:
                 # Copies full data to output
                 for j in range(self.header.full_size[1]):
                     for k in range(self.header.full_size[0]):
-                        dst_pos = self.__getTexturePosition(k, j)
+                        dst_pos = self._getTexturePosition(k, j)
                         pixel_data = image_tmp.getpixel((dst_pos[0], dst_pos[1]))
-                        data.extend(self.__convertPixelDataToBytes(self.header.format, pixel_data))
+                        data.extend(self._convertPixelDataToBytes(self.header.format, pixel_data))
 
                 if (self.header.mip_level - 1 - i > 1):
                     width = width // 2
@@ -523,7 +522,7 @@ class Texture3dst:
         
         # Process pixel data
         self.flipVertical()
-        data = self.__formatPixelData()
+        data = self._formatPixelData()
         self.flipVertical()
 
         textureFileBuffer = open(path, "wb")
