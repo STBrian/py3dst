@@ -74,16 +74,16 @@ class Texture3dst:
     header: _headerTexture3dst
     size: List[int]
     textureData: List[List[bytes]]
-    FORMATS = (("rgba8", True),
-               ("rgb8", True),
-               ("rgba5551", True),
-               ("rgb565", True),
-               ("rgba4", True),
-               ("la8", True),
-               ("hilo8", False),
-               ("l8", False),
-               ("a8", False),
-               ("la4", True))
+    FORMATS = (("rgba8", True, 4, 4),
+               ("rgb8", True, 3, 3),
+               ("rgba5551", True, 2, 4),
+               ("rgb565", True, 2, 3),
+               ("rgba4", True, 2, 4),
+               ("la8", True, 2, 2),
+               ("hilo8", False, 2, 2),
+               ("l8", False, 1, 1),
+               ("a8", False, 1, 1),
+               ("la4", True, 1, 2))
 
     def _matchFormat(self, format: str) -> int:
         for i, value in enumerate(self.FORMATS):
@@ -101,38 +101,16 @@ class Texture3dst:
         format_info = {}
         format_info["name"] = self.FORMATS[format][0]
         format_info["supported"] = self.FORMATS[format][1]
-        match format:
-            case 0: # rgba8
-                format_info["pixel_lenght"] = 4
-                format_info["pixel_channels"] = 4
-            case 1: # rgb8
-                format_info["pixel_lenght"] = 3
-                format_info["pixel_channels"] = 3
-            case 2: # rgba5551
-                format_info["pixel_lenght"] = 2
-                format_info["pixel_channels"] = 4
-            case 3: # rgb565
-                format_info["pixel_lenght"] = 2
-                format_info["pixel_channels"] = 3
-            case 4: # rgba4
-                format_info["pixel_lenght"] = 2
-                format_info["pixel_channels"] = 4
-            case 5: # la8
-                format_info["pixel_lenght"] = 2
-                format_info["pixel_channels"] = 2
-            case 9: # la4
-                format_info["pixel_lenght"] = 1
-                format_info["pixel_channels"] = 2
-
+        format_info["pixel_lenght"] = self.FORMATS[format][2]
+        format_info["pixel_channels"] = self.FORMATS[format][3]
         return format_info
 
-    def _convertPixelDataToBytes(self, format: int, pixel_data: List[int] | Tuple[int]) -> bytes:
-        if not isinstance(format, int):
-            raise TypeError(genericTypeErrorMessage("format", format, int))
+    def _convertPixelDataToBytes(self, pixel_data: List[int] | Tuple[int]) -> bytes:
         if not isinstance(pixel_data, list) and not isinstance(pixel_data, tuple):
             raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
         
         # Validate values
+        format = self.header.format
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
@@ -188,15 +166,16 @@ class Texture3dst:
                 l = int((pixel_data[0] / 0xFF) * maxIntBits(4))
                 a = int((pixel_data[1] / 0xFF) * maxIntBits(4))
                 combined = (l << 4) | a
+            case _:
+                raise ValueError("Texture 'format' value invalid")
         return combined.to_bytes(format_info["pixel_lenght"], "little", signed=False)
 
-    def _convertBytesToPixelData(self, format: int, pixel_bytes: bytes) -> Tuple[int]:
-        if not isinstance(format, int):
-            raise TypeError(genericTypeErrorMessage("format", format, int))
+    def _convertBytesToPixelData(self, pixel_bytes: bytes) -> Tuple[int]:
         if not isinstance(pixel_bytes, bytes):
             raise TypeError(genericTypeErrorMessage("pixel_bytes", pixel_bytes, bytes))
         
         # Validate values
+        format = self.header.format
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
@@ -243,6 +222,8 @@ class Texture3dst:
                 l = int(((pixel_value >> 4) & 0xF) / 0xF * 0xFF)
                 a = int((pixel_value & 0xF) / 0xF * 0xFF)
                 combined = (l, a)
+            case _:
+                raise ValueError("Texture 'format' value invalid")
         return combined
 
     def open(self, path: str | Path):
@@ -338,7 +319,7 @@ class Texture3dst:
         
         # Verify format and support
         format_match = self._matchFormat(format.lower())
-        if format_match:
+        if format_match != None:
             format_info = self._getFormatInfo(format_match)
             if not format_info["supported"]:
                 raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
@@ -391,7 +372,7 @@ class Texture3dst:
             if num < 0 or num > 255:
                 raise ValueError("'pixel_data' values must be between 0 and 255")        
         
-        self.textureData[y][x] = self._convertPixelDataToBytes(format, pixel_data)
+        self.textureData[y][x] = self._convertPixelDataToBytes(pixel_data)
         return
 
     def getPixel(self, x: int, y: int) -> Tuple[int]:
@@ -406,8 +387,7 @@ class Texture3dst:
         if y < 0 or y >= self.size[1]:
             raise ValueError("y coordinates out of range")
         
-        format = self.header.format
-        return self._convertBytesToPixelData(format, self.textureData[y][x])
+        return self._convertBytesToPixelData(self.textureData[y][x])
     
     def copy(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
         if not isinstance(x1, int):
@@ -542,7 +522,7 @@ class Texture3dst:
             for j in range(resized_height):
                 for k in range(resized_width):
                     dst_pos = _getTexturePosition(k, j, resized_width)
-                    rearrenged_data[dst_pos[1]][dst_pos[0]] = self._convertPixelDataToBytes(self.header.format, image_tmp.getpixel((k, j)))
+                    rearrenged_data[dst_pos[1]][dst_pos[0]] = self._convertPixelDataToBytes(image_tmp.getpixel((k, j)))
             data.extend(_matrixToBytearray(rearrenged_data))
         return
 
