@@ -1,6 +1,6 @@
 Python module to read/edit 3DST textures from MC3DS Edition
 
-Supported formats:
+## Supported formats:
 - RGBA8
 - RGB8
 - RGBA5551
