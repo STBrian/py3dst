@@ -397,14 +397,14 @@ class Texture3dst:
         # Validate values
         if x1 < 0 or x1 >= self.size[0]:
             raise ValueError("x1 coordinates out of range")
-        if x2 < 0 or x2 >= self.size[0]:
+        if x2 < 0 or x2 > self.size[0]:
             raise ValueError("x2 coordinates out of range")
         elif x2 < x1:
             raise ValueError("x2 coordinates must be greater than x1")
         
         if y1 < 0 and y1 >= self.size[1]:
             raise ValueError("y1 coordinates out of range")
-        if y2 < 0 and y2 >= self.size[1]:
+        if y2 < 0 and y2 > self.size[1]:
             raise ValueError("y2 coordinates out of range")
         elif y2 < y1:
             raise ValueError("y2 coordinates must be greater than y1")
