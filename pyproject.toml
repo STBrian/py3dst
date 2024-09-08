@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "py3dst"
 version = "1.0.0"
-description = "Python module to read/edit 3DST textures from MC3DS Edition"
+description = "Python module to read/edit 3DST textures."
 readme = "README.md"
 authors = [{ name = "STBrian", email = "brichap100@gmail.com" }]
 license = { file = "LICENSE" }
