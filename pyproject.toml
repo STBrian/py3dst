@@ -1,0 +1,37 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py3dst"
+version = "1.0.0"
+description = "Python module to read/edit 3DST textures."
+readme = "README.md"
+authors = [{ name = "STBrian", email = "brichap100@gmail.com" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["3dst"]
+dependencies = [
+    "numpy >= 1.26.0",
+    "pillow >= 10.3.0",
+]
+requires-python = ">=3.11"
+
+[project.urls]
+Homepage = "https://github.com/STBrian/py3dst"
+
+[tool.bumpver]
+current_version = "1.0.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "Bump version {old_version} -> {new_version}"
+commit = true
+tag = false
+push = false
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['current_version = "{version}"','version = "{version}"']
+"src/py3dst/__init__.py" = ["{version}"]
