@@ -138,15 +138,15 @@ class Texture3dst:
         
         format_info = self._getFormatInfo(format)
         if not format_info["supported"]:
-            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
+            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info['name']}")
         
         if not _checkListType(pixel_data, int):
             raise TypeError("'pixel_data' must only contain int values")
         
         if len(pixel_data) > format_info["pixel_channels"]:
-            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info['name']}")
         elif len(pixel_data) < format_info["pixel_channels"]:
-            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info['name']}")
         
         if not _checkListRange(pixel_data, 0, 255):
             raise ValueError("'pixel_data' values must be between 0 to 255")
@@ -202,7 +202,7 @@ class Texture3dst:
         
         format_info = self._getFormatInfo(format)
         if not format_info["supported"]:
-            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info["name"]}")
+            raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info['name']}")
         
         pixel_value = int.from_bytes(pixel_bytes, "little", signed=False)
 
@@ -271,7 +271,7 @@ class Texture3dst:
         if format_info == None:
             raise Texture3dstUnsupported(f"Texture format unsupported: {format}")
         elif not format_info["supported"]:
-            raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info["name"]}'")
+            raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
 
         # Full dimensions must be a power of 2
         full_width = self.header.full_size[0]
@@ -341,7 +341,7 @@ class Texture3dst:
         if format_match:
             format_info = self._getFormatInfo(format_match)
             if not format_info["supported"]:
-                raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info["name"]}'")
+                raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
         else:
             raise ValueError(f"Texture format invalid: {format}")
         
@@ -383,9 +383,9 @@ class Texture3dst:
         format = self.header.format
         format_info = self._getFormatInfo(format)
         if len(pixel_data) > format_info["pixel_channels"]:
-            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+            raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info['name']}")
         elif len(pixel_data) < format_info["pixel_channels"]:
-            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info["name"]}")
+            raise ValueError(f"Too few values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info['name']}")
         
         for num in pixel_data:
             if num < 0 or num > 255:
