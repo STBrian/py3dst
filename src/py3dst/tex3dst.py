@@ -337,7 +337,7 @@ class Texture3dst:
             raise Texture3dstException("'mip_level' value greater than supported")
         
         # Verify format and support
-        format_match = self._matchFormat(format)
+        format_match = self._matchFormat(format.lower())
         if format_match:
             format_info = self._getFormatInfo(format_match)
             if not format_info["supported"]:
