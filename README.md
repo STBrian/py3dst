@@ -1,12 +1,12 @@
 py3dst is a module that allows to read, edit and convert 3DST textures
 
-## Installation
+# Installation
 
 ```bash
 pip install py3dst
 ```
 
-## Supported formats:
+# Supported formats:
 - RGBA8
 - RGB8
 - RGBA5551
@@ -15,7 +15,7 @@ pip install py3dst
 - LA8
 - LA4
 
-## How to use
+# How to use
 ### Open a texture
 The open() function decodes and loads the texture at the provided path
 ```python
