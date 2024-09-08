@@ -41,6 +41,29 @@ def _checkListRange(obj: list | tuple, min: int, max: int):
             return False
     return True
 
+def _createPixelDataStructure(width: int, height: int) -> List[List[int]]:
+    list_structure = [[] for _ in range(height)]
+    for element in list_structure:
+        for _ in range(width):
+            element.append(bytes([0]))
+    return list_structure
+
+def _matrixToLinear(obj: List[List[bytes]]) -> List[bytes]:
+    linear = []
+    for element in obj:
+        for value in element:
+            linear.append(value)
+    return linear
+
+def _joinBytesList(obj: List[bytes]) -> bytearray:
+    array = bytearray()
+    for value in obj:
+        array.extend(value)
+    return array
+
+def _matrixToBytearray(obj: List[List[bytes]]):
+    return _joinBytesList(_matrixToLinear(obj))
+
 class Texture3dst:
     header: _headerTexture3dst
     size: List[int]
@@ -231,7 +254,7 @@ class Texture3dst:
         textureFileBuffer = open(path, "rb")
         
         # File signature
-        if read_bytes(textureFileBuffer, 4) != b'3DST':
+        if textureFileBuffer.read(4) != b'3DST':
             raise Texture3dstException("Texture does not contain file signature")
         
         # Header of the file
@@ -268,20 +291,22 @@ class Texture3dst:
         # Save size
         self.size = (int(self.header.size[0]), int(self.header.size[1]))
 
-        # Creates empty structure for pixel data
-        self.textureData = [[] for _ in range(self.header.full_size[1])]
-        for element in self.textureData:
-            for _ in range(self.header.full_size[0]):
-                element.append(bytes([0]))
-        
-        # Storage pixel data in place
-        for i in range(self.header.full_size[1]):
-            for j in range(self.header.full_size[0]):
-                pixel_read = read_bytes(textureFileBuffer, format_info["pixel_lenght"])
-                dst_pos = self._getTexturePosition(j, i)
-                self.textureData[dst_pos[1]][dst_pos[0]] = pixel_read
+        unarranged_texture_data = _createPixelDataStructure(full_width, full_height)
+        # Gets all pixel data from file
+        for i in range(full_height):
+            for j in range(full_width):
+                pixel_read = textureFileBuffer.read(format_info["pixel_lenght"])
+                unarranged_texture_data[i][j] = pixel_read
 
         textureFileBuffer.close()
+
+        self.textureData = _createPixelDataStructure(full_width, full_height)
+        # Arrange pixel data in place
+        for i in range(full_height):
+            for j in range(full_width):
+                dst_pos = self._getTexturePosition(j, i)
+                self.textureData[i][j] = unarranged_texture_data[dst_pos[1]][dst_pos[0]]
+
         # All textures are upside down by default
         self.flipVertical()
         return self
@@ -399,14 +424,14 @@ class Texture3dst:
             raise ValueError("x1 coordinates out of range")
         if x2 < 0 or x2 > self.size[0]:
             raise ValueError("x2 coordinates out of range")
-        elif x2 < x1:
+        elif x2 <= x1:
             raise ValueError("x2 coordinates must be greater than x1")
         
         if y1 < 0 and y1 >= self.size[1]:
             raise ValueError("y1 coordinates out of range")
         if y2 < 0 and y2 > self.size[1]:
             raise ValueError("y2 coordinates out of range")
-        elif y2 < y1:
+        elif y2 <= y1:
             raise ValueError("y2 coordinates must be greater than y1")
         
         copy_data = [[] for _ in  range(y2 - y1)]
@@ -467,54 +492,61 @@ class Texture3dst:
         return copy_data
     
     def _formatPixelData(self) -> bytearray:
+        full_width = self.header.full_size[0]
+        full_height = self.header.full_size[0]
+
         # Rearrange pixels and saves them in data
-        data = bytearray()
+        rearrenged_data = _createPixelDataStructure(full_width, full_height)
         for i in range(self.header.full_size[1]):
             for j in range(self.header.full_size[0]):
                 dst_pos = self._getTexturePosition(j, i)
-                data.extend(self.textureData[dst_pos[1]][dst_pos[0]])
+                rearrenged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
+        data = _matrixToBytearray(rearrenged_data)
 
         # In case of mipmaps
         if self.header.mip_level > 1:
-            width = self.header.full_size[0]
-            height = self.header.full_size[1]
-            resized_width = width
-            resized_height = height
-
-            # Copy pixel data to a new image
-            match self.header.format:
-                case 0 | 2 | 4: # rgba8 | rgba5551 | rgba4
-                    image_tmp = Image.new("RGBA", (width, height))
-                case 1 | 3: # rgb8 | rgb565
-                    image_tmp = Image.new("RGB", (width, height))
-                case 5 | 9: # la8 | la4
-                    image_tmp = Image.new("LA", (width, height))
-                case _:
-                    raise ValueError("Texture 'format' value invalid")
-                
-            image_tmp_data = image_tmp.load()
-            for i in range(0, height):
-                for j in range(0, width):
-                    pixel_data = self.getPixel(j, i)
-                    image_tmp_data[j, i] = pixel_data
-
-            for i in range(self.header.mip_level - 1):
-                # Resizes image at half
-                resized_width = resized_width // 2
-                resized_height = resized_height // 2
-                image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
-                
-                # Copies full data to output
-                for j in range(self.header.full_size[1]):
-                    for k in range(self.header.full_size[0]):
-                        dst_pos = self._getTexturePosition(k, j)
-                        pixel_data = image_tmp.getpixel((dst_pos[0], dst_pos[1]))
-                        data.extend(self._convertPixelDataToBytes(self.header.format, pixel_data))
-
-                if (self.header.mip_level - 1 - i > 1):
-                    width = width // 2
-                    height = height // 2
+            self._processMipLevels(data)
         return data
+
+    def _processMipLevels(self, data: bytearray) -> None:
+        full_width = self.header.full_size[0]
+        full_height = self.header.full_size[0]
+        width = self.header.full_size[0]
+        height = self.header.full_size[1]
+        resized_width = width
+        resized_height = height
+
+        match self.header.format:
+            case 0 | 2 | 4: # rgba8 | rgba5551 | rgba4
+                image_tmp = Image.new("RGBA", (width, height))
+            case 1 | 3: # rgb8 | rgb565
+                image_tmp = Image.new("RGB", (width, height))
+            case 5 | 9: # la8 | la4
+                image_tmp = Image.new("LA", (width, height))
+            case _:
+                raise ValueError("Texture 'format' value invalid")
+            
+        # Copy pixel data to a new image
+        image_tmp_data = image_tmp.load()
+        for i in range(0, height):
+            for j in range(0, width):
+                pixel_data = self.getPixel(j, i)
+                image_tmp_data[j, i] = pixel_data
+
+        for i in range(self.header.mip_level - 1):
+            # Resizes image at half
+            resized_width = resized_width // 2
+            resized_height = resized_height // 2
+            image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
+            
+            # Rearrange pixels and appends them to output
+            rearrenged_data = _createPixelDataStructure(full_width, full_height)
+            for j in range(self.header.full_size[1]):
+                for k in range(self.header.full_size[0]):
+                    dst_pos = self._getTexturePosition(k, j)
+                    rearrenged_data[dst_pos[1]][dst_pos[0]] = image_tmp.getpixel((k, j))
+            data.extend(_matrixToBytearray(rearrenged_data))
+        return
 
     def export(self, path: str | Path) -> None:
         if not isinstance(path, str) and not isinstance(path, Path):
