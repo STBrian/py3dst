@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py3dst"
-version = "1.0.2"
+version = "1.1.0"
 description = "Python module to read/edit 3DST textures."
 readme = "README.md"
 authors = [{ name = "STBrian", email = "brichap100@gmail.com" }]
@@ -25,7 +25,7 @@ requires-python = ">=3.11"
 Homepage = "https://github.com/STBrian/py3dst"
 
 [tool.bumpver]
-current_version = "1.0.2"
+current_version = "1.1.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version {old_version} -> {new_version}"
 commit = true

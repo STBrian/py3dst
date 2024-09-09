@@ -6,7 +6,7 @@ from pathlib import Path
 from .tex3dst import Texture3dst
 from .errors import *
 
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 
 def main():
     parser = argparse.ArgumentParser(prog="py3dst", description="Display or convert 3DST textures")
