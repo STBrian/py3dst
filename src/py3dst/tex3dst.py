@@ -236,7 +236,7 @@ class Texture3dst:
         
         # File signature
         if textureFileBuffer.read(4) != b'3DST':
-            raise Texture3dstException("Texture does not contain file signature")
+            raise NotSigTexture3dst()
         
         # Header of the file
         self.header = _headerTexture3dst()
@@ -294,12 +294,14 @@ class Texture3dst:
 
     def new(self, width: int, height: int, mip_level: int = 1, format: str = "rgba8"):
         # Validate types
-        if type(width) != int:
+        if not isinstance(width, int):
             raise TypeError(genericTypeErrorMessage("width", width, int))
-        if type(height) != int:
+        if not isinstance(height, int):
             raise TypeError(genericTypeErrorMessage("height", height, int))
-        if type(mip_level) != int:
+        if not isinstance(mip_level, int):
             raise TypeError(genericTypeErrorMessage("miplevel", mip_level, int))
+        if not isinstance(format, str):
+            raise TypeError(genericTypeErrorMessage("format", format, str))
         
         # Validate values
         if width <= 0:
@@ -338,10 +340,7 @@ class Texture3dst:
         self.size = (width, height)
 
         # Creates empty structure for pixel data
-        self.textureData = [[] for _ in range(self.header.full_size[1])]
-        for element in self.textureData:
-            for _ in range(self.header.full_size[0]):
-                element.append(bytes([0]))
+        self.textureData = _createPixelDataStructure(full_width, full_height)
         return self
 
     def setPixel(self, x: int, y: int, pixel_data: Tuple[int] | List[int]) -> None:
@@ -421,9 +420,23 @@ class Texture3dst:
         data_buffer = numpy.asarray(copy_data, dtype=numpy.uint8)
         return Image.fromarray(data_buffer)
 
-    def fromImage(self, image: Image.Image):
+    def fromImage(self, image: Image.Image, format: str = "rgba8"):
+        if not isinstance(image, Image.Image):
+            raise TypeError(genericTypeErrorMessage("image", image, Image.Image))
+        if not isinstance(format, str):
+            raise TypeError(genericTypeErrorMessage("format", format, str))
+
+        # Verify format and support
+        format_match = self._matchFormat(format.lower())
+        if format_match != None:
+            format_info = self._getFormatInfo(format_match)
+            if not format_info["supported"]:
+                raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
+        else:
+            raise ValueError(f"Texture format invalid: {format}")
+        
         img_w, img_h = image.size
-        self.new(img_w, img_h, 1)
+        self.new(img_w, img_h, format=format)
         self.paste(image, 0, 0)
         return self
 
@@ -473,15 +486,15 @@ class Texture3dst:
     
     def _formatPixelData(self) -> bytearray:
         full_width = self.header.full_size[0]
-        full_height = self.header.full_size[0]
+        full_height = self.header.full_size[1]
 
         # Rearrange pixels and saves them in data
-        rearrenged_data = _createPixelDataStructure(full_width, full_height)
+        rearranged_data = _createPixelDataStructure(full_width, full_height)
         for i in range(self.header.full_size[1]):
             for j in range(self.header.full_size[0]):
                 dst_pos = _getTexturePosition(j, i, full_width)
-                rearrenged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
-        data = _matrixToBytearray(rearrenged_data)
+                rearranged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
+        data = _matrixToBytearray(rearranged_data)
 
         # In case of mipmaps
         if self.header.mip_level > 1:
@@ -518,12 +531,12 @@ class Texture3dst:
             image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
             
             # Rearrange pixels and appends them to output
-            rearrenged_data = _createPixelDataStructure(resized_width, resized_height)
+            rearranged_data = _createPixelDataStructure(resized_width, resized_height)
             for j in range(resized_height):
                 for k in range(resized_width):
                     dst_pos = _getTexturePosition(k, j, resized_width)
-                    rearrenged_data[dst_pos[1]][dst_pos[0]] = self._convertPixelDataToBytes(image_tmp.getpixel((k, j)))
-            data.extend(_matrixToBytearray(rearrenged_data))
+                    rearranged_data[dst_pos[1]][dst_pos[0]] = self._convertPixelDataToBytes(image_tmp.getpixel((k, j)))
+            data.extend(_matrixToBytearray(rearranged_data))
         return
 
     def export(self, path: str | Path) -> None:

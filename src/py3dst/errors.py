@@ -4,6 +4,10 @@ class Texture3dstException(Exception):
     def __init__(self, message):
         super().__init__(message)
 
+class NotSigTexture3dst(Exception):
+    def __init__(self):
+        super().__init__("Texture does not contain file signature")
+
 class Texture3dstUnsupported(Texture3dstException):
     pass
 
