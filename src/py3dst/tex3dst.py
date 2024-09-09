@@ -236,7 +236,7 @@ class Texture3dst:
         
         # File signature
         if textureFileBuffer.read(4) != b'3DST':
-            raise NotSigTexture3dst()
+            raise Texture3dstNoSignature()
         
         # Header of the file
         self.header = _headerTexture3dst()

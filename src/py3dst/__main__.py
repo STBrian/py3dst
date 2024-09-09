@@ -64,7 +64,7 @@ def main():
                 except Exception as e:
                     print("Error: Unable to convert file:", e)
                     sys.exit(7)
-            except NotSigTexture3dst:
+            except Texture3dstNoSignature:
                 try:
                     image = Image.open(path)
                     try:
