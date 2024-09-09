@@ -4,7 +4,7 @@ from PIL import Image, ImageTk, UnidentifiedImageError
 from glob import iglob
 from pathlib import Path
 from .tex3dst import Texture3dst
-from .errors import *
+from .error_classes import *
 
 __version__ = "1.1.0"
 

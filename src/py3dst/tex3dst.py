@@ -7,7 +7,7 @@ from typing import BinaryIO, Tuple, List, Union
 
 from .primitive_types import *
 from .utils import isPowerOfTwo, getClosestPowerOfTwo, maxIntBits
-from .errors import *
+from .error_classes import *
 
 @dataclass
 class _headerTexture3dst:
