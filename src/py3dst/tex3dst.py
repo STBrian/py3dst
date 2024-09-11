@@ -493,10 +493,21 @@ class Texture3dst:
 
         # Rearrange pixels and saves them in data
         rearranged_data = _createPixelDataStructure(full_width, full_height)
-        for i in range(self.header.full_size[1]):
+        i = 0
+        while i < self.header.full_size[1]:
             for j in range(self.header.full_size[0]):
                 dst_pos = _getTexturePosition(j, i, full_width)
+
+                if dst_pos[1] >= full_height: # Prevents some miscalculations with the real dimensions
+                    # Expands available slots
+                    for k in range(full_height):
+                        self.textureData.append([bytes([0]) for _ in range(full_width)])
+                        rearranged_data.append([bytes([0]) for _ in range(full_width)])
+                    self.header.full_size[1] *= 2
+                    full_height = self.header.full_size[1]
+
                 rearranged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
+            i += 1
         data = _matrixToBytearray(rearranged_data)
 
         # In case of mipmaps
