@@ -1,3 +1,4 @@
+import math
 import numpy
 from PIL import Image
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import BinaryIO, Tuple, List, Union
 
-from .primitive_types import *
+from .primitive_types import read_uint32, write_uint32
 from .utils import isPowerOfTwo, getClosestPowerOfTwo, maxIntBits
 from .error_classes import *
 
@@ -27,7 +28,9 @@ def _readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: _headerTexture3dst):
     headerDst.mip_level = read_uint32(fileBuffer)
 
 def _isMipLevelValid(width, height, mip_level) -> bool:
-    return (width / (2 ** (mip_level - 1)) >= 8) and (height / (2 ** (mip_level - 1)) >= 8)
+    num1 = int(math.log2(width)) # Times that can be divided by 2
+    num2 = int(math.log2(height))
+    return mip_level <= num1 and mip_level <= num2
 
 def _getTexturePosition(x: int, y: int, width: int) -> Tuple[int]:
         dst_pos = ((((y >> 3) * (width >> 3) + (x >> 3)) << 6) + ((x & 1) | ((y & 1) << 1) | ((x & 2) << 1) | ((y & 2) << 2) | ((x & 4) << 2) | ((y & 4) << 3)))
