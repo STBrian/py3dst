@@ -50,11 +50,11 @@ def _checkListRange(obj: list | tuple, min: int, max: int):
             return False
     return True
 
-def _createPixelDataStructure(width: int, height: int) -> List[List[int]]:
+def _createPixelDataStructure(width: int, height: int, length: int) -> List[List[int]]:
     list_structure = [[] for _ in range(height)]
     for element in list_structure:
         for _ in range(width):
-            element.append(bytes([0]))
+            element.append(bytes(length))
     return list_structure
 
 def _matrixToLinear(obj: List[List[bytes]]) -> List[bytes]:
@@ -275,16 +275,18 @@ class Texture3dst:
         # Save size
         self.size = (int(self.header.size[0]), int(self.header.size[1]))
 
-        unarranged_texture_data = _createPixelDataStructure(full_width, full_height)
+        unarranged_texture_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
         # Gets all pixel data from file
         for i in range(full_height):
             for j in range(full_width):
                 pixel_read = textureFileBuffer.read(format_info["pixel_lenght"])
+                if not pixel_read:
+                    raise Texture3dstUnexpectedEndOfFile
                 unarranged_texture_data[i][j] = pixel_read
 
         textureFileBuffer.close()
 
-        self.textureData = _createPixelDataStructure(full_width, full_height)
+        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
         # Arrange pixel data in place
         for i in range(full_height):
             for j in range(full_width):
@@ -343,7 +345,7 @@ class Texture3dst:
         self.size = (width, height)
 
         # Creates empty structure for pixel data
-        self.textureData = _createPixelDataStructure(full_width, full_height)
+        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
         return self
 
     def setPixel(self, x: int, y: int, pixel_data: Tuple[int] | List[int]) -> None:
@@ -488,24 +490,29 @@ class Texture3dst:
         return copy_data
     
     def _formatPixelData(self) -> bytearray:
+        format_info = self._getFormatInfo(self.header.format)
         full_width = self.header.full_size[0]
         full_height = self.header.full_size[1]
 
         # Rearrange pixels and saves them in data
-        rearranged_data = _createPixelDataStructure(full_width, full_height)
+        rearranged_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
+        # This is done to prevent miscalculations with real dimensions
         i = 0
         while i < self.header.full_size[1]:
             for j in range(self.header.full_size[0]):
                 dst_pos = _getTexturePosition(j, i, full_width)
-
                 if dst_pos[1] >= full_height: # Prevents some miscalculations with the real dimensions
                     # Expands available slots
                     for k in range(full_height):
-                        self.textureData.append([bytes([0]) for _ in range(full_width)])
-                        rearranged_data.append([bytes([0]) for _ in range(full_width)])
+                        self.textureData.append([bytes(format_info["pixel_lenght"]) for _ in range(full_width)])
+                        rearranged_data.append([bytes(format_info["pixel_lenght"]) for _ in range(full_width)])
                     self.header.full_size[1] *= 2
                     full_height = self.header.full_size[1]
-
+            i += 1
+        self.flipVertical()
+        for i in range(self.header.full_size[1]):
+            for j in range(self.header.full_size[0]):
+                dst_pos = _getTexturePosition(j, i, full_width)
                 rearranged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
             i += 1
         data = _matrixToBytearray(rearranged_data)
@@ -513,9 +520,11 @@ class Texture3dst:
         # In case of mipmaps
         if self.header.mip_level > 1:
             self._processMipLevels(data)
+        self.flipVertical()
         return data
 
     def _processMipLevels(self, data: bytearray) -> None:
+        format_info = self._getFormatInfo(self.header.format)
         width = self.header.full_size[0]
         height = self.header.full_size[1]
         resized_width = width
@@ -545,7 +554,7 @@ class Texture3dst:
             image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
             
             # Rearrange pixels and appends them to output
-            rearranged_data = _createPixelDataStructure(resized_width, resized_height)
+            rearranged_data = _createPixelDataStructure(resized_width, resized_height, format_info["pixel_lenght"])
             for j in range(resized_height):
                 for k in range(resized_width):
                     dst_pos = _getTexturePosition(k, j, resized_width)
@@ -558,9 +567,7 @@ class Texture3dst:
             raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
         
         # Process pixel data
-        self.flipVertical()
         data = self._formatPixelData()
-        self.flipVertical()
 
         textureFileBuffer = open(path, "wb")
 

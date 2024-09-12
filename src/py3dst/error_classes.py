@@ -11,6 +11,10 @@ class Texture3dstNoSignature(Texture3dstException):
 class Texture3dstUnsupported(Texture3dstException):
     pass
 
+class Texture3dstUnexpectedEndOfFile(Texture3dstException):
+    def __init__(self):
+        super().__init__("Unexpected end of file")
+
 def formatType(annotation) -> str:
     if hasattr(annotation, '__origin__') and annotation.__origin__ is Union:
         types = get_args(annotation)
