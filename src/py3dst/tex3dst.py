@@ -560,16 +560,14 @@ class Texture3dst:
             for j in range(width):
                 pixel_data1 = self.getPixel(j, i)
                 pixel_data2 = tex2.getPixel(j, i)
-                if self.header.format in (0, 2, 4) and ignoreAlpha:
-                    if pixel_data1[3] != 0 or pixel_data2[3] != 0:
-                        if pixel_data1 != pixel_data2:
+                if pixel_data1 != pixel_data2:
+                    if self.header.format in (0, 2, 4) and ignoreAlpha:
+                        if pixel_data1[3] != 0 or pixel_data2[3] != 0:
                             return False
-                elif self.header.format in (5, 9) and ignoreAlpha:
-                    if pixel_data1[1] != 0 or pixel_data2[1] != 0:
-                        if pixel_data1 != pixel_data2:
+                    elif self.header.format in (5, 9) and ignoreAlpha:
+                        if pixel_data1[1] != 0 or pixel_data2[1] != 0:
                             return False
-                else:
-                    if pixel_data1 != pixel_data2:
+                    else:
                         return False
         return True
 
