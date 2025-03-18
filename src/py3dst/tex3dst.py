@@ -399,9 +399,67 @@ class Texture3dst:
         return self._convertBytesToPixelData(self.textureData[y][x])
     
     def toImage(self) -> Image.Image:
-        return self.copy(0, 0, self.size[0], self.size[1])
+        return self.cropToImage(0, 0, self.size[0], self.size[1])
 
-    def copy(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
+    def crop(self, x1: int, y1: int, x2: int, y2: int) -> Texture3dst:
+        if not isinstance(x1, int):
+            raise TypeError(genericTypeErrorMessage("x1", x1, int))
+        if not isinstance(y1, int):
+            raise TypeError(genericTypeErrorMessage("y1", y1, int))
+        if not isinstance(x2, int):
+            raise TypeError(genericTypeErrorMessage("x2", x2, int))
+        if not isinstance(y2, int):
+            raise TypeError(genericTypeErrorMessage("y2", y2, int))
+        
+        # Validate values
+        if x1 < 0 or x1 >= self.size[0]:
+            raise ValueError("x1 coordinates out of range")
+        if x2 < 0 or x2 > self.size[0]:
+            raise ValueError("x2 coordinates out of range")
+        elif x2 <= x1:
+            raise ValueError("x2 coordinates must be greater than x1")
+        
+        if y1 < 0 and y1 >= self.size[1]:
+            raise ValueError("y1 coordinates out of range")
+        if y2 < 0 and y2 > self.size[1]:
+            raise ValueError("y2 coordinates out of range")
+        elif y2 <= y1:
+            raise ValueError("y2 coordinates must be greater than y1")
+        
+        formatInfo = self._getFormatInfo(self.header.format)
+        crop_texture = Texture3dst().new(x2-x1, y2-y1, self.header.mip_level, formatInfo["name"])
+        for i in range(y1, y2):
+            for j in range(x1, x2):
+                crop_texture.setPixel(j-x1, i-y1, self.getPixel(j, i))
+        return crop_texture
+
+    def paste(self, tex2: Texture3dst, x: int, y: int):
+        if not isinstance(x, int):
+            raise TypeError(genericTypeErrorMessage("x", x, int))
+        if not isinstance(y, int):
+            raise TypeError(genericTypeErrorMessage("y", y, int))
+        
+        # Validate values
+        if x < 0 or x >= self.size[0]:
+            raise ValueError("x1 coordinates out of range")
+        
+        if y < 0 and y >= self.size[1]:
+            raise ValueError("y1 coordinates out of range")
+        
+        if self.header.format != tex2.header.format:
+            raise TypeError("Texture format must be the same as destination")
+
+        img_width = tex2.size[0]
+        img_height = tex2.size[1]
+        if img_width + x > self.size[0] or img_height + y > self.size[1]:
+            raise Texture3dstException("Not enough space to paste image")
+
+        print(img_width, img_height)
+        for i in range(tex2.size[1]):
+            for j in range(tex2.size[0]):
+                self.setPixel(x + j, y + i, tex2.getPixel(j, i))
+
+    def cropToImage(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
         if not isinstance(x1, int):
             raise TypeError(genericTypeErrorMessage("x1", x1, int))
         if not isinstance(y1, int):
@@ -450,10 +508,10 @@ class Texture3dst:
         
         img_w, img_h = image.size
         self.new(img_w, img_h, format=format)
-        self.paste(image, 0, 0)
+        self.pasteImage(image, 0, 0)
         return self
 
-    def paste(self, image: Image.Image, x: int, y: int) -> None:
+    def pasteImage(self, image: Image.Image, x: int, y: int) -> None:
         if not isinstance(image, Image.Image):
             raise TypeError(genericTypeErrorMessage("image", image, Image.Image))
         if not isinstance(x, int):
@@ -465,7 +523,7 @@ class Texture3dst:
         
         img_width = image.size[0]
         img_height = image.size[1]
-        if img_width > x + self.size[0] or img_height > y + self.size[1]:
+        if img_width + x > self.size[0] or img_height + y > self.size[1]:
             raise Texture3dstException("Not enough space to paste image")
         
         match self.header.format:
@@ -483,11 +541,13 @@ class Texture3dst:
                 self.setPixel(x+j, y+i, new_image.getpixel((j, i)))
         return
 
-    def differenceMask(self, tex2: Texture3dst) -> Texture3dst:
+    def compare(self, tex2: Texture3dst) -> bool:
         if not isinstance(tex2, Texture3dst):
             raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
         if self.header.format != tex2.header.format:
             raise TypeError("Textures must be the same format to use this function")
+        if self.size != tex2.size:
+            return False
         formatInfo = self._getFormatInfo(self.header.format)
         result_texture = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
 
@@ -504,74 +564,8 @@ class Texture3dst:
                 pixel_data1 = self.getPixel(j, i)
                 pixel_data2 = tex2.getPixel(j, i)
                 if pixel_data1 != pixel_data2:
-                    new_data = [1] * formatInfo["pixel_channels"]
-                    result_texture.setPixel(j, i, new_data)
-        return result_texture
-
-    def pasteMask(self, tex2: Texture3dst, maskTex: Texture3dst) -> Texture3dst:
-        if not isinstance(tex2, Texture3dst):
-            raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
-        if self.header.format != tex2.header.format or self.header.format != maskTex.header.format:
-            raise TypeError("Textures must be the same format to use this function")
-        if self.size != maskTex.size:
-            raise ValueError("Mask must be same size as texture")
-        formatInfo = self._getFormatInfo(self.header.format)
-        result_texture = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
-
-        width = self.size[0]
-        height = self.size[1]
-
-        if tex2.size[0] < width:
-            width = tex2.size[0]
-        if tex2.size[1] < height:
-            height = tex2.size[1]
-
-        for i in range(height):
-            for j in range(width):
-                pixel_mask = maskTex.getPixel(j, i)
-                pixel_data1 = self.getPixel(j, i)
-                pixel_data2 = tex2.getPixel(j, i)
-                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
-                if pixel_mask == valid_pixel:
-                    result_texture.setPixel(j, i, pixel_data2)
-                else:
-                    result_texture.setPixel(j, i, pixel_data1)
-        return result_texture
-
-    def addMask(self, mask: Texture3dst) -> Texture3dst:
-        if not isinstance(mask, Texture3dst):
-            raise TypeError("Mask expected to be 'Texture3dst'")
-        if self.header.format != mask.header.format:
-            raise TypeError("Masks must be the same format to use this function")
-        if self.size != mask.size:
-            raise ValueError("Masks must be same size")
-        formatInfo = self._getFormatInfo(self.header.format)
-        result_mask = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
-
-        width = self.size[0]
-        height = self.size[1]
-
-        for i in range(height):
-            for j in range(width):
-                pixel_mask1 = self.getPixel(j, i)
-                pixel_mask2 = mask.getPixel(j, i)
-                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
-                if pixel_mask1 == valid_pixel or pixel_mask2 == valid_pixel:
-                    result_mask.setPixel(j, i, valid_pixel)
-        return result_mask
-
-    def notEmptyMask(self) -> bool:
-        formatInfo = self._getFormatInfo(self.header.format)
-        width = self.size[0]
-        height = self.size[1]
-
-        for i in range(height):
-            for j in range(width):
-                pixel_mask1 = self.getPixel(j, i)
-                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
-                if pixel_mask1 == valid_pixel:
-                    return True
-        return False
+                    return False
+        return True
 
     def flipVertical(self) -> None:
         self.textureData.reverse()
