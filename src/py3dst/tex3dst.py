@@ -2,6 +2,7 @@
 # This file is part of 'py3dst' and is licensed under the GPLv3.
 # See <https://www.gnu.org/licenses/> for details.
 
+from __future__ import annotations
 import math
 import numpy
 from PIL import Image
@@ -108,7 +109,7 @@ class Texture3dst:
         format_info = {}
         format_info["name"] = self.FORMATS[format][0]
         format_info["supported"] = self.FORMATS[format][1]
-        format_info["pixel_lenght"] = self.FORMATS[format][2]
+        format_info["pixel_length"] = self.FORMATS[format][2]
         format_info["pixel_channels"] = self.FORMATS[format][3]
         return format_info
 
@@ -175,7 +176,7 @@ class Texture3dst:
                 combined = (l << 4) | a
             case _:
                 raise ValueError("Texture 'format' value invalid")
-        return combined.to_bytes(format_info["pixel_lenght"], "little", signed=False)
+        return combined.to_bytes(format_info["pixel_length"], "little", signed=False)
 
     def _convertBytesToPixelData(self, pixel_bytes: bytes) -> Tuple[int]:
         if not isinstance(pixel_bytes, bytes):
@@ -279,18 +280,18 @@ class Texture3dst:
         # Save size
         self.size = (int(self.header.size[0]), int(self.header.size[1]))
 
-        unarranged_texture_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
+        unarranged_texture_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         # Gets all pixel data from file
         for i in range(full_height):
             for j in range(full_width):
-                pixel_read = textureFileBuffer.read(format_info["pixel_lenght"])
+                pixel_read = textureFileBuffer.read(format_info["pixel_length"])
                 if not pixel_read:
                     raise Texture3dstUnexpectedEndOfFile
                 unarranged_texture_data[i][j] = pixel_read
 
         textureFileBuffer.close()
 
-        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
+        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         # Arrange pixel data in place
         for i in range(full_height):
             for j in range(full_width):
@@ -349,7 +350,7 @@ class Texture3dst:
         self.size = (width, height)
 
         # Creates empty structure for pixel data
-        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
+        self.textureData = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         return self
 
     def setPixel(self, x: int, y: int, pixel_data: Tuple[int] | List[int]) -> None:
@@ -361,7 +362,7 @@ class Texture3dst:
             raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
         for num in pixel_data:
             if not isinstance(num, int):
-                raise ValueError("'pixel_data' values must be only int types")
+                raise ValueError(f"'pixel_data' values must be only int types. Found {type(num)}")
         
         # Validate values
         if x < 0 or x >= self.size[0]:
@@ -397,6 +398,9 @@ class Texture3dst:
         
         return self._convertBytesToPixelData(self.textureData[y][x])
     
+    def toImage(self) -> Image.Image:
+        return self.copy(0, 0, self.size[0], self.size[1])
+
     def copy(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
         if not isinstance(x1, int):
             raise TypeError(genericTypeErrorMessage("x1", x1, int))
@@ -456,6 +460,8 @@ class Texture3dst:
             raise TypeError(genericTypeErrorMessage("x", x, int))
         if not isinstance(y, int):
             raise TypeError(genericTypeErrorMessage("y", y, int))
+        if image.size[0] <= 0 or image.size[1] <= 0:
+            raise ValueError("Image size must be greater than 0")
         
         img_width = image.size[0]
         img_height = image.size[1]
@@ -472,10 +478,100 @@ class Texture3dst:
             case _:
                 raise ValueError("Texture 'format' value invalid")
         
-        for i in range(y, img_height):
-            for j in range(x, img_width):
-                self.setPixel(j, i, new_image.getpixel((j, i)))
+        for i in range(new_image.size[1]):
+            for j in range(new_image.size[0]):
+                self.setPixel(x+j, y+i, new_image.getpixel((j, i)))
         return
+
+    def differenceMask(self, tex2: Texture3dst) -> Texture3dst:
+        if not isinstance(tex2, Texture3dst):
+            raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
+        if self.header.format != tex2.header.format:
+            raise TypeError("Textures must be the same format to use this function")
+        formatInfo = self._getFormatInfo(self.header.format)
+        result_texture = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
+
+        width = self.size[0]
+        height = self.size[1]
+
+        if tex2.size[0] < width:
+            width = tex2.size[0]
+        if tex2.size[1] < height:
+            height = tex2.size[1]
+
+        for i in range(height):
+            for j in range(width):
+                pixel_data1 = self.getPixel(j, i)
+                pixel_data2 = tex2.getPixel(j, i)
+                if pixel_data1 != pixel_data2:
+                    new_data = [1] * formatInfo["pixel_channels"]
+                    result_texture.setPixel(j, i, new_data)
+        return result_texture
+
+    def pasteMask(self, tex2: Texture3dst, maskTex: Texture3dst) -> Texture3dst:
+        if not isinstance(tex2, Texture3dst):
+            raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
+        if self.header.format != tex2.header.format or self.header.format != maskTex.header.format:
+            raise TypeError("Textures must be the same format to use this function")
+        if self.size != maskTex.size:
+            raise ValueError("Mask must be same size as texture")
+        formatInfo = self._getFormatInfo(self.header.format)
+        result_texture = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
+
+        width = self.size[0]
+        height = self.size[1]
+
+        if tex2.size[0] < width:
+            width = tex2.size[0]
+        if tex2.size[1] < height:
+            height = tex2.size[1]
+
+        for i in range(height):
+            for j in range(width):
+                pixel_mask = maskTex.getPixel(j, i)
+                pixel_data1 = self.getPixel(j, i)
+                pixel_data2 = tex2.getPixel(j, i)
+                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
+                if pixel_mask == valid_pixel:
+                    result_texture.setPixel(j, i, pixel_data2)
+                else:
+                    result_texture.setPixel(j, i, pixel_data1)
+        return result_texture
+
+    def addMask(self, mask: Texture3dst) -> Texture3dst:
+        if not isinstance(mask, Texture3dst):
+            raise TypeError("Mask expected to be 'Texture3dst'")
+        if self.header.format != mask.header.format:
+            raise TypeError("Masks must be the same format to use this function")
+        if self.size != mask.size:
+            raise ValueError("Masks must be same size")
+        formatInfo = self._getFormatInfo(self.header.format)
+        result_mask = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
+
+        width = self.size[0]
+        height = self.size[1]
+
+        for i in range(height):
+            for j in range(width):
+                pixel_mask1 = self.getPixel(j, i)
+                pixel_mask2 = mask.getPixel(j, i)
+                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
+                if pixel_mask1 == valid_pixel or pixel_mask2 == valid_pixel:
+                    result_mask.setPixel(j, i, valid_pixel)
+        return result_mask
+
+    def notEmptyMask(self) -> bool:
+        formatInfo = self._getFormatInfo(self.header.format)
+        width = self.size[0]
+        height = self.size[1]
+
+        for i in range(height):
+            for j in range(width):
+                pixel_mask1 = self.getPixel(j, i)
+                valid_pixel = tuple([1] * formatInfo["pixel_channels"])
+                if pixel_mask1 == valid_pixel:
+                    return True
+        return False
 
     def flipVertical(self) -> None:
         self.textureData.reverse()
@@ -499,7 +595,7 @@ class Texture3dst:
         full_height = self.header.full_size[1]
 
         # Rearrange pixels and saves them in data
-        rearranged_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_lenght"])
+        rearranged_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         # This is done to prevent miscalculations with real dimensions
         i = 0
         while i < self.header.full_size[1]:
@@ -508,8 +604,8 @@ class Texture3dst:
                 if dst_pos[1] >= full_height: # Prevents some miscalculations with the real dimensions
                     # Expands available slots
                     for k in range(full_height):
-                        self.textureData.append([bytes(format_info["pixel_lenght"]) for _ in range(full_width)])
-                        rearranged_data.append([bytes(format_info["pixel_lenght"]) for _ in range(full_width)])
+                        self.textureData.append([bytes(format_info["pixel_length"]) for _ in range(full_width)])
+                        rearranged_data.append([bytes(format_info["pixel_length"]) for _ in range(full_width)])
                     self.header.full_size[1] *= 2
                     full_height = self.header.full_size[1]
             i += 1
@@ -558,7 +654,7 @@ class Texture3dst:
             image_tmp = image_tmp.resize((resized_width, resized_height), Image.Resampling.LANCZOS)
             
             # Rearrange pixels and appends them to output
-            rearranged_data = _createPixelDataStructure(resized_width, resized_height, format_info["pixel_lenght"])
+            rearranged_data = _createPixelDataStructure(resized_width, resized_height, format_info["pixel_length"])
             for j in range(resized_height):
                 for k in range(resized_width):
                     dst_pos = _getTexturePosition(k, j, resized_width)
