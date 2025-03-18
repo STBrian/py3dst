@@ -454,7 +454,6 @@ class Texture3dst:
         if img_width + x > self.size[0] or img_height + y > self.size[1]:
             raise Texture3dstException("Not enough space to paste image")
 
-        print(img_width, img_height)
         for i in range(tex2.size[1]):
             for j in range(tex2.size[0]):
                 self.setPixel(x + j, y + i, tex2.getPixel(j, i))
@@ -541,15 +540,13 @@ class Texture3dst:
                 self.setPixel(x+j, y+i, new_image.getpixel((j, i)))
         return
 
-    def compare(self, tex2: Texture3dst) -> bool:
+    def compare(self, tex2: Texture3dst, ignoreAlpha: bool = True) -> bool:
         if not isinstance(tex2, Texture3dst):
             raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
         if self.header.format != tex2.header.format:
             raise TypeError("Textures must be the same format to use this function")
         if self.size != tex2.size:
             return False
-        formatInfo = self._getFormatInfo(self.header.format)
-        result_texture = Texture3dst().new(self.size[0], self.size[1], self.header.mip_level, formatInfo["name"].lower())
 
         width = self.size[0]
         height = self.size[1]
@@ -563,8 +560,17 @@ class Texture3dst:
             for j in range(width):
                 pixel_data1 = self.getPixel(j, i)
                 pixel_data2 = tex2.getPixel(j, i)
-                if pixel_data1 != pixel_data2:
-                    return False
+                if self.header.format in (0, 2, 4) and ignoreAlpha:
+                    if pixel_data1[3] != 0 or pixel_data2[3] != 0:
+                        if pixel_data1 != pixel_data2:
+                            return False
+                elif self.header.format in (5, 9) and ignoreAlpha:
+                    if pixel_data1[1] != 0 or pixel_data2[1] != 0:
+                        if pixel_data1 != pixel_data2:
+                            return False
+                else:
+                    if pixel_data1 != pixel_data2:
+                        return False
         return True
 
     def flipVertical(self) -> None:
