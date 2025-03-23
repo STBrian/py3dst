@@ -551,11 +551,6 @@ class Texture3dst:
         width = self.size[0]
         height = self.size[1]
 
-        if tex2.size[0] < width:
-            width = tex2.size[0]
-        if tex2.size[1] < height:
-            height = tex2.size[1]
-
         for i in range(height):
             for j in range(width):
                 pixel_data1 = self.getPixel(j, i)
@@ -587,7 +582,7 @@ class Texture3dst:
                 copy_data[i].append(self.getPixel(j, i))
         return copy_data
     
-    def _formatPixelData(self) -> bytearray:
+    def _formatPixelData(self, mipmapOpaque: bool) -> bytearray:
         format_info = self._getFormatInfo(self.header.format)
         full_width = self.header.full_size[0]
         full_height = self.header.full_size[1]
@@ -612,16 +607,16 @@ class Texture3dst:
             for j in range(self.header.full_size[0]):
                 dst_pos = _getTexturePosition(j, i, full_width)
                 rearranged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
-            i += 1
+
         data = _matrixToBytearray(rearranged_data)
 
         # In case of mipmaps
         if self.header.mip_level > 1:
-            self._processMipLevels(data)
+            self._processMipLevels(data, mipmapOpaque)
         self.flipVertical()
         return data
 
-    def _processMipLevels(self, data: bytearray) -> None:
+    def _processMipLevels(self, data: bytearray, opaque) -> None:
         format_info = self._getFormatInfo(self.header.format)
         width = self.header.full_size[0]
         height = self.header.full_size[1]
@@ -642,8 +637,14 @@ class Texture3dst:
         image_tmp_data = image_tmp.load()
         for i in range(0, height):
             for j in range(0, width):
-                pixel_data = self.getPixel(j, i)
-                image_tmp_data[j, i] = pixel_data
+                pixel_data = list(self.getPixel(j, i))
+                if opaque:
+                    match self.header.format:
+                        case 0 | 2 | 4:
+                            pixel_data[3] = 255
+                        case 5 | 9:
+                            pixel_data[1] = 255
+                image_tmp_data[j, i] = tuple(pixel_data)
 
         for i in range(self.header.mip_level - 1):
             # Resizes image at half
@@ -660,12 +661,12 @@ class Texture3dst:
             data.extend(_matrixToBytearray(rearranged_data))
         return
 
-    def export(self, path: str | Path) -> None:
+    def export(self, path: str | Path, mipmapOpaque: bool = False) -> None:
         if not isinstance(path, str) and not isinstance(path, Path):
             raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
         
         # Process pixel data
-        data = self._formatPixelData()
+        data = self._formatPixelData(mipmapOpaque)
 
         textureFileBuffer = open(path, "wb")
 
