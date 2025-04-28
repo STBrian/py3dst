@@ -3,6 +3,7 @@
 # See <https://www.gnu.org/licenses/> for details.
 
 from typing import Union, get_args
+import inspect
 
 class Texture3dstException(Exception):
     def __init__(self, message):
@@ -28,3 +29,7 @@ def formatType(annotation) -> str:
 
 def genericTypeErrorMessage(name: str, var, istype):
     return f"'{name}' expected to be {formatType(istype)}, not {type(var)}"
+
+def assertType(name: str, var, istype):
+    if not isinstance(var, istype):
+        raise TypeError(genericTypeErrorMessage(name, var, istype))

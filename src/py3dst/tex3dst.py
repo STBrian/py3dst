@@ -100,8 +100,7 @@ class Texture3dst:
         return None
     
     def _getFormatInfo(self, format: int) -> dict:
-        if not isinstance(format, int):
-            raise TypeError(genericTypeErrorMessage("format", format, int))
+        assertType("format", format, int)
         
         if format < 0 or format >= len(self.FORMATS):
             return None
@@ -114,8 +113,7 @@ class Texture3dst:
         return format_info
 
     def _convertPixelDataToBytes(self, pixel_data: List[int] | Tuple[int]) -> bytes:
-        if not isinstance(pixel_data, list) and not isinstance(pixel_data, tuple):
-            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
+        assertType("pixel_data", pixel_data, Union[list, tuple])
         
         # Validate values
         format = self.header.format
@@ -179,8 +177,7 @@ class Texture3dst:
         return combined.to_bytes(format_info["pixel_length"], "little", signed=False)
 
     def _convertBytesToPixelData(self, pixel_bytes: bytes) -> Tuple[int]:
-        if not isinstance(pixel_bytes, bytes):
-            raise TypeError(genericTypeErrorMessage("pixel_bytes", pixel_bytes, bytes))
+        assertType("pixel_bytes", pixel_bytes, bytes)
         
         # Validate values
         format = self.header.format
@@ -236,8 +233,7 @@ class Texture3dst:
 
     def open(self, path: str | Path):
         # Validate types
-        if  not isinstance(path, str) and not isinstance(path, Path):
-            raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
+        assertType("path", path, Union[str, Path])
         
         # File from the texture will be loaded
         textureFileBuffer = open(path, "rb")
@@ -304,14 +300,10 @@ class Texture3dst:
 
     def new(self, width: int, height: int, mip_level: int = 1, format: str = "rgba8"):
         # Validate types
-        if not isinstance(width, int):
-            raise TypeError(genericTypeErrorMessage("width", width, int))
-        if not isinstance(height, int):
-            raise TypeError(genericTypeErrorMessage("height", height, int))
-        if not isinstance(mip_level, int):
-            raise TypeError(genericTypeErrorMessage("miplevel", mip_level, int))
-        if not isinstance(format, str):
-            raise TypeError(genericTypeErrorMessage("format", format, str))
+        assertType("width", width, int)
+        assertType("height", height, int)
+        assertType("mip_level", mip_level, int)
+        assertType("format", format, str)
         
         # Validate values
         if width <= 0:
@@ -354,15 +346,11 @@ class Texture3dst:
         return self
 
     def setPixel(self, x: int, y: int, pixel_data: Tuple[int] | List[int]) -> None:
-        if not isinstance(x, int):
-            raise TypeError(genericTypeErrorMessage("x", x, int))
-        if not isinstance(y, int):
-            raise TypeError(genericTypeErrorMessage("y", y, int))
-        if not isinstance(pixel_data, tuple) and not isinstance(pixel_data, list):
-            raise TypeError(genericTypeErrorMessage("pixel_data", pixel_data, Union[list, tuple]))
-        for num in pixel_data:
-            if not isinstance(num, int):
-                raise ValueError(f"'pixel_data' values must be only int types. Found {type(num)}")
+        assertType("x", x, int)
+        assertType("y", y, int)
+        assertType("pixel_data", pixel_data, Union[list, tuple])
+        if not _checkListType(pixel_data, int):
+            raise TypeError(f"'pixel_data' values must be only int types. Found {type(num)}")
         
         # Validate values
         if x < 0 or x >= self.size[0]:
@@ -385,10 +373,8 @@ class Texture3dst:
         return
 
     def getPixel(self, x: int, y: int) -> Tuple[int]:
-        if not isinstance(x, int):
-            raise TypeError(genericTypeErrorMessage("x", x, int))
-        if not isinstance(y, int):
-            raise TypeError(genericTypeErrorMessage("y", y, int))
+        assertType("x", x, int)
+        assertType("y", y, int)
 
         # Validate values
         if x < 0 or x >= self.size[0]:
@@ -402,14 +388,10 @@ class Texture3dst:
         return self.cropToImage(0, 0, self.size[0], self.size[1])
 
     def crop(self, x1: int, y1: int, x2: int, y2: int) -> Texture3dst:
-        if not isinstance(x1, int):
-            raise TypeError(genericTypeErrorMessage("x1", x1, int))
-        if not isinstance(y1, int):
-            raise TypeError(genericTypeErrorMessage("y1", y1, int))
-        if not isinstance(x2, int):
-            raise TypeError(genericTypeErrorMessage("x2", x2, int))
-        if not isinstance(y2, int):
-            raise TypeError(genericTypeErrorMessage("y2", y2, int))
+        assertType("x1", x1, int)
+        assertType("y1", y1, int)
+        assertType("x2", x2, int)
+        assertType("y2", y2, int)
         
         # Validate values
         if x1 < 0 or x1 >= self.size[0]:
@@ -434,10 +416,9 @@ class Texture3dst:
         return crop_texture
 
     def paste(self, tex2: Texture3dst, x: int, y: int):
-        if not isinstance(x, int):
-            raise TypeError(genericTypeErrorMessage("x", x, int))
-        if not isinstance(y, int):
-            raise TypeError(genericTypeErrorMessage("y", y, int))
+        assertType("tex2", tex2, Texture3dst)
+        assertType("x", x, int)
+        assertType("y", y, int)
         
         # Validate values
         if x < 0 or x >= self.size[0]:
@@ -459,28 +440,24 @@ class Texture3dst:
                 self.setPixel(x + j, y + i, tex2.getPixel(j, i))
 
     def cropToImage(self, x1: int, y1: int, x2: int, y2: int) -> Image.Image:
-        if not isinstance(x1, int):
-            raise TypeError(genericTypeErrorMessage("x1", x1, int))
-        if not isinstance(y1, int):
-            raise TypeError(genericTypeErrorMessage("y1", y1, int))
-        if not isinstance(x2, int):
-            raise TypeError(genericTypeErrorMessage("x2", x2, int))
-        if not isinstance(y2, int):
-            raise TypeError(genericTypeErrorMessage("y2", y2, int))
+        assertType("x1", x1, int)
+        assertType("y1", y1, int)
+        assertType("x2", x2, int)
+        assertType("y2", y2, int)
         
         # Validate values
         if x1 < 0 or x1 >= self.size[0]:
             raise ValueError("x1 coordinates out of range")
         if x2 < 0 or x2 > self.size[0]:
             raise ValueError("x2 coordinates out of range")
-        elif x2 <= x1:
+        if x2 <= x1:
             raise ValueError("x2 coordinates must be greater than x1")
         
         if y1 < 0 and y1 >= self.size[1]:
             raise ValueError("y1 coordinates out of range")
         if y2 < 0 and y2 > self.size[1]:
             raise ValueError("y2 coordinates out of range")
-        elif y2 <= y1:
+        if y2 <= y1:
             raise ValueError("y2 coordinates must be greater than y1")
         
         copy_data = [[] for _ in  range(y2 - y1)]
@@ -491,10 +468,8 @@ class Texture3dst:
         return Image.fromarray(data_buffer)
 
     def fromImage(self, image: Image.Image, format: str = "rgba8"):
-        if not isinstance(image, Image.Image):
-            raise TypeError(genericTypeErrorMessage("image", image, Image.Image))
-        if not isinstance(format, str):
-            raise TypeError(genericTypeErrorMessage("format", format, str))
+        assertType("image", image, Image.Image)
+        assertType("format", format, str)
 
         # Verify format and support
         format_match = self._matchFormat(format.lower())
@@ -511,12 +486,9 @@ class Texture3dst:
         return self
 
     def pasteImage(self, image: Image.Image, x: int, y: int) -> None:
-        if not isinstance(image, Image.Image):
-            raise TypeError(genericTypeErrorMessage("image", image, Image.Image))
-        if not isinstance(x, int):
-            raise TypeError(genericTypeErrorMessage("x", x, int))
-        if not isinstance(y, int):
-            raise TypeError(genericTypeErrorMessage("y", y, int))
+        assertType("image", image, Image.Image)
+        assertType("x", x, int)
+        assertType("y", y, int)
         if image.size[0] <= 0 or image.size[1] <= 0:
             raise ValueError("Image size must be greater than 0")
         
@@ -541,8 +513,7 @@ class Texture3dst:
         return
 
     def compare(self, tex2: Texture3dst, ignoreAlpha: bool = True) -> bool:
-        if not isinstance(tex2, Texture3dst):
-            raise TypeError(f"'tex2' expected 'Texture3dst' not {type(tex2)}")
+        assertType("tex2", tex2, Texture3dst)
         if self.header.format != tex2.header.format:
             raise TypeError("Textures must be the same format to use this function")
         if self.size != tex2.size:
@@ -616,7 +587,7 @@ class Texture3dst:
         self.flipVertical()
         return data
 
-    def _processMipLevels(self, data: bytearray, opaque) -> None:
+    def _processMipLevels(self, data: bytearray, opaque: bool) -> None:
         format_info = self._getFormatInfo(self.header.format)
         width = self.header.full_size[0]
         height = self.header.full_size[1]
@@ -662,8 +633,7 @@ class Texture3dst:
         return
 
     def export(self, path: str | Path, mipmapOpaque: bool = False) -> None:
-        if not isinstance(path, str) and not isinstance(path, Path):
-            raise TypeError(genericTypeErrorMessage("path", path, Union[str, Path]))
+        assertType("path", path, Union[str, Path])
         
         # Process pixel data
         data = self._formatPixelData(mipmapOpaque)

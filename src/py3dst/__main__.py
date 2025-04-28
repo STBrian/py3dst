@@ -1,4 +1,4 @@
-# Copyright (C) 2025 STBrian
+    # Copyright (C) 2025 STBrian
 # This file is part of 'py3dst' and is licensed under the GPLv3.
 # See <https://www.gnu.org/licenses/> for details.
 
@@ -19,7 +19,7 @@ def convertFile(input_path: Path, output_path: Path, show_unidentified_image: bo
     try:
         texture = Texture3dst().open(input_path)
         try:
-            image = texture.copy(0, 0, texture.size[0], texture.size[1])
+            image = texture.cropToImage(0, 0, texture.size[0], texture.size[1])
             if not output_path.exists():
                 os.makedirs(output_path)
             image.save(f"{output_path}/{input_path.stem}.png")
@@ -139,7 +139,7 @@ def main():
                 print("Error: Unable to load 3dst texture:", e)
                 return 3
 
-            image = texture.copy(0, 0, texture.size[0], texture.size[1])
+            image = texture.cropToImage(0, 0, texture.size[0], texture.size[1])
             
             root = tkinter.Tk()
             root.title(path.name)
