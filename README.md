@@ -2,8 +2,14 @@ py3dst is a module that allows to read, edit and convert 3DST textures
 
 # Installation
 
+You can use the latest stable release from PyPi
 ```bash
 pip install py3dst
+```
+
+Or install from the repository for latest changes but with the risk of unstability
+```bash
+pip install git+https://github.com/STBrian/py3dst.git
 ```
 
 # Command-line interface

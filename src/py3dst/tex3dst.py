@@ -15,21 +15,25 @@ from .primitive_types import read_uint32, write_uint32
 from .utils import isPowerOfTwo, getClosestPowerOfTwo, maxIntBits
 from .error_classes import *
 
+class _size2:
+    width: int
+    height: int
+
 @dataclass
 class _headerTexture3dst:
     mode: int = 0
     format: int = 0
-    full_size: List[int] = field(default_factory=lambda: [0, 0]) # Texture real full size
-    size: List[int] = field(default_factory=lambda: [0, 0]) # Texture size
+    full_size: _size2 = field(default_factory=_size2) # Texture real full size
+    size: _size2 = field(default_factory=_size2) # Texture size
     mip_level: int = 0
 
 def _readTexture3dstHeader(fileBuffer: BinaryIO, headerDst: _headerTexture3dst):
     headerDst.mode = read_uint32(fileBuffer)
     headerDst.format = read_uint32(fileBuffer)
-    headerDst.full_size[0] = read_uint32(fileBuffer) # real full width
-    headerDst.full_size[1] = read_uint32(fileBuffer) # real full height
-    headerDst.size[0] = read_uint32(fileBuffer) # width
-    headerDst.size[1] = read_uint32(fileBuffer) # height
+    headerDst.full_size.width = read_uint32(fileBuffer) # real full width
+    headerDst.full_size.height = read_uint32(fileBuffer) # real full height
+    headerDst.size.width = read_uint32(fileBuffer) # width
+    headerDst.size.height = read_uint32(fileBuffer) # height
     headerDst.mip_level = read_uint32(fileBuffer)
 
 def _isMipLevelValid(width, height, mip_level) -> bool:
@@ -231,7 +235,9 @@ class Texture3dst:
                 raise ValueError("Texture 'format' value invalid")
         return combined
 
-    def open(self, path: str | Path):
+    @staticmethod
+    def open(path: str | Path) -> Texture3dst:
+        self = Texture3dst()
         # Validate types
         assertType("path", path, Union[str, Path])
         
@@ -259,8 +265,8 @@ class Texture3dst:
             raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
 
         # Full dimensions must be a power of 2
-        full_width = self.header.full_size[0]
-        full_height = self.header.full_size[1]
+        full_width = self.header.full_size.width
+        full_height = self.header.full_size.height
         if not isPowerOfTwo(full_width):
             raise ValueError(f"Texture full width is not power of 2: {full_width}")
         if not isPowerOfTwo(full_height):
@@ -274,7 +280,7 @@ class Texture3dst:
             raise Texture3dstException("Mip level' value greater than supported")
 
         # Save size
-        self.size = (int(self.header.size[0]), int(self.header.size[1]))
+        self.size = (int(self.header.size.width), int(self.header.size.height))
 
         unarranged_texture_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         # Gets all pixel data from file
@@ -298,7 +304,9 @@ class Texture3dst:
         self.flipVertical()
         return self
 
-    def new(self, width: int, height: int, mip_level: int = 1, format: str = "rgba8"):
+    @staticmethod
+    def new(width: int, height: int, mip_level: int = 1, format: str = "rgba8") -> Texture3dst:
+        self = Texture3dst()
         # Validate types
         assertType("width", width, int)
         assertType("height", height, int)
@@ -333,10 +341,10 @@ class Texture3dst:
         self.header = _headerTexture3dst()
         self.header.mode = 3
         self.header.format = format_match
-        self.header.full_size[0] = full_width
-        self.header.full_size[1] = full_height
-        self.header.size[0] = width
-        self.header.size[1] = height
+        self.header.full_size.width = full_width
+        self.header.full_size.height = full_height
+        self.header.size.width = width
+        self.header.size.height = height
         self.header.mip_level = mip_level
 
         self.size = (width, height)
@@ -467,7 +475,9 @@ class Texture3dst:
         data_buffer = numpy.asarray(copy_data, dtype=numpy.uint8)
         return Image.fromarray(data_buffer)
 
-    def fromImage(self, image: Image.Image, format: str = "rgba8"):
+    @staticmethod
+    def fromImage(image: Image.Image, format: str = "rgba8") -> Texture3dst:
+        self = Texture3dst()
         assertType("image", image, Image.Image)
         assertType("format", format, str)
 
@@ -555,27 +565,27 @@ class Texture3dst:
     
     def _formatPixelData(self, mipmapOpaque: bool) -> bytearray:
         format_info = self._getFormatInfo(self.header.format)
-        full_width = self.header.full_size[0]
-        full_height = self.header.full_size[1]
+        full_width = self.header.full_size.width
+        full_height = self.header.full_size.height
 
         # Rearrange pixels and saves them in data
         rearranged_data = _createPixelDataStructure(full_width, full_height, format_info["pixel_length"])
         # This is done to prevent miscalculations with real dimensions
         i = 0
-        while i < self.header.full_size[1]:
-            for j in range(self.header.full_size[0]):
+        while i < self.header.full_size.height:
+            for j in range(self.header.full_size.width):
                 dst_pos = _getTexturePosition(j, i, full_width)
                 if dst_pos[1] >= full_height: # Prevents some miscalculations with the real dimensions
                     # Expands available slots
                     for k in range(full_height):
                         self.textureData.append([bytes(format_info["pixel_length"]) for _ in range(full_width)])
                         rearranged_data.append([bytes(format_info["pixel_length"]) for _ in range(full_width)])
-                    self.header.full_size[1] *= 2
-                    full_height = self.header.full_size[1]
+                    self.header.full_size.height *= 2
+                    full_height = self.header.full_size.height
             i += 1
         self.flipVertical()
-        for i in range(self.header.full_size[1]):
-            for j in range(self.header.full_size[0]):
+        for i in range(self.header.full_size.height):
+            for j in range(self.header.full_size.width):
                 dst_pos = _getTexturePosition(j, i, full_width)
                 rearranged_data[dst_pos[1]][dst_pos[0]] = self.textureData[i][j]
 
@@ -589,8 +599,8 @@ class Texture3dst:
 
     def _processMipLevels(self, data: bytearray, opaque: bool) -> None:
         format_info = self._getFormatInfo(self.header.format)
-        width = self.header.full_size[0]
-        height = self.header.full_size[1]
+        width = self.header.full_size.width
+        height = self.header.full_size.height
         resized_width = width
         resized_height = height
 
@@ -649,8 +659,8 @@ class Texture3dst:
         write_uint32(textureFileBuffer, self.header.format)
 
         ## Texture real full size
-        write_uint32(textureFileBuffer, self.header.full_size[0])
-        write_uint32(textureFileBuffer, self.header.full_size[1])
+        write_uint32(textureFileBuffer, self.header.full_size.width)
+        write_uint32(textureFileBuffer, self.header.full_size.height)
 
         ## Texture size
         write_uint32(textureFileBuffer, self.size[0])
