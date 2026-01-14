@@ -19,6 +19,13 @@ class _size2:
     width: int
     height: int
 
+    def __getitem__(self, key):
+        if key == 0:
+            return self.width
+        elif key == 1:
+            return self.height
+        return ValueError("Invalid index")
+
 @dataclass
 class _headerTexture3dst:
     mode: int = 0
