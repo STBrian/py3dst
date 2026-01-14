@@ -1,4 +1,5 @@
 from __future__ import annotations
+from importlib.resources import files
 
 import os
 import ctypes
@@ -10,15 +11,13 @@ from warnings import deprecated
 
 from py3dst.utils import maxIntBits
 
-_path = os.path.dirname(os.path.realpath(__file__))
-
 if os.name == "nt":
-    libtex3dst = ctypes.WinDLL(os.path.join(_path, "libtex3dst.dll"))
+    libtex3dst = ctypes.WinDLL(files("py3dst.py3dst_exp") / "libtex3dst.dll")
 elif os.name == "posix":
     import platform
 
     if platform.system() == "Linux":
-        libtex3dst = ctypes.CDLL(os.path.join(_path, "libtex3dst.so"))
+        libtex3dst = ctypes.CDLL(files("py3dst.py3dst_exp") / "libtex3dst.so")
     else:
         raise ImportError("OS not supported by py3dst_exp")
 else:
