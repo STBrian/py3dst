@@ -35,6 +35,13 @@ class _size2(ctypes.Structure):
         ("height", ctypes.c_uint32)
     ]
 
+    def __getitem__(self, key):
+        if key == 0:
+            return self.width
+        elif key == 1:
+            return self.height
+        return ValueError("Invalid index")
+
 class _HeaderTexture3dst(ctypes.Structure):
     _fields_ = [
         ("mode", ctypes.c_uint32),
