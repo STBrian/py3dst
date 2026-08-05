@@ -15,9 +15,9 @@ from .error_classes import *
 
 __version__ = "1.3.0"
 
-def convertFile(input_path: Path, output_path: Path, show_unidentified_image: bool, show_tracebacks: bool):
+def convertFile(input_path: Path, output_path: Path, format: str, mip_levels: int, show_unidentified_image: bool, show_tracebacks: bool):
     try:
-        texture = Texture3dst().open(input_path)
+        texture = Texture3dst.open(input_path)
         try:
             image = texture.cropToImage(0, 0, texture.size[0], texture.size[1])
             if not output_path.exists():
@@ -34,9 +34,10 @@ def convertFile(input_path: Path, output_path: Path, show_unidentified_image: bo
         try:
             image = Image.open(input_path)
             try:
-                texture = Texture3dst().fromImage(image)
+                texture = Texture3dst.fromImage(image, format=format)
                 if not output_path.exists():
                     os.makedirs(output_path)
+                texture.header.mip_level = mip_levels
                 texture.export(f"{output_path}/{input_path.stem}.3dst")
                 print("File saved at:", f"{output_path.absolute()}/{input_path.stem}.3dst")
             except Exception as e:
@@ -79,7 +80,7 @@ def main():
     parser.add_argument(
         "--show-tracebacks", 
         action="store_true",
-        help="this will show tracebacks when a file is not converted fro unhandled reasons"
+        help="this will show tracebacks when a file is not converted for unhandled reasons"
     )
     parser.add_argument(
         "-c", 
@@ -116,6 +117,14 @@ def main():
         default="rgba8",
         help="color format for the output ('rgba8', 'rgb8', 'rgba5551', 'rgb565', 'rgba4', 'la8', 'la4')"
     )
+    parser.add_argument( 
+        "--mip-levels", 
+        action="store", 
+        type=int,
+        metavar=("MIPLEVELS"),
+        default=1,
+        help="number of mipmap levels for the output (default: 1)"
+    )
     parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -134,7 +143,7 @@ def main():
         path = Path(args.path)
         if path.exists() and path.is_file():
             try:
-                texture = Texture3dst().open(path)
+                texture = Texture3dst.open(path)
             except Exception as e:
                 print("Error: Unable to load 3dst texture:", e)
                 return 3
@@ -159,7 +168,7 @@ def main():
         path = Path(args.path)
         if path.exists() and path.is_file():
             try:
-                texture = Texture3dst().open(path)
+                texture = Texture3dst.open(path)
             except Exception as e:
                 print("Error: Unable to load 3dst texture:", e)
                 return 3
@@ -177,7 +186,7 @@ def main():
             input_path = Path(path)
             if input_path.exists() and input_path.is_file():
                 input_path = Path(path)
-                status_code = convertFile(input_path, output_path, show_unidentified_image=True, show_tracebacks=args.show_tracebacks)
+                status_code = convertFile(input_path, output_path, args.format, args.mip_levels, show_unidentified_image=True, show_tracebacks=args.show_tracebacks)
                 if not args.suppress_errors and status_code:
                     return status_code
             elif input_path.exists() and input_path.is_dir():
@@ -189,7 +198,7 @@ def main():
                 for file in input_files:
                     file_path = Path(file)
                     if file_path.is_file():
-                        status_code = convertFile(file_path, output_path, show_unidentified_image=False, show_tracebacks=args.show_tracebacks)
+                        status_code = convertFile(file_path, output_path, "rgba8", 1, show_unidentified_image=False, show_tracebacks=args.show_tracebacks)
                         if status_code and not args.suppress_errors and status_code != 7:
                             return status_code
             else:

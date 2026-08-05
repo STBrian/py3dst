@@ -104,23 +104,25 @@ class Texture3dst:
                ("a8", False, 1, 1),
                ("la4", True, 1, 2))
 
-    def _matchFormat(self, format: str) -> int:
-        for i, value in enumerate(self.FORMATS):
+    @classmethod
+    def _matchFormat(cls, format: str) -> int:
+        for i, value in enumerate(cls.FORMATS):
             if value[0] == format:
                 return i
         return None
     
-    def _getFormatInfo(self, format: int) -> dict:
+    @classmethod
+    def _getFormatInfo(cls, format: int) -> dict:
         assertType("format", format, int)
         
-        if format < 0 or format >= len(self.FORMATS):
+        if format < 0 or format >= len(cls.FORMATS):
             return None
         
         format_info = {}
-        format_info["name"] = self.FORMATS[format][0]
-        format_info["supported"] = self.FORMATS[format][1]
-        format_info["pixel_length"] = self.FORMATS[format][2]
-        format_info["pixel_channels"] = self.FORMATS[format][3]
+        format_info["name"] = cls.FORMATS[format][0]
+        format_info["supported"] = cls.FORMATS[format][1]
+        format_info["pixel_length"] = cls.FORMATS[format][2]
+        format_info["pixel_channels"] = cls.FORMATS[format][3]
         return format_info
 
     def _convertPixelDataToBytes(self, pixel_data: List[int] | Tuple[int]) -> bytes:
@@ -131,7 +133,7 @@ class Texture3dst:
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
-        format_info = self._getFormatInfo(format)
+        format_info = Texture3dst._getFormatInfo(format)
         if not format_info["supported"]:
             raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info['name']}")
         
@@ -195,7 +197,7 @@ class Texture3dst:
         if format < 0 or format >= len(self.FORMATS):
             raise ValueError(f"Unexpected 'format' value: {format}")
         
-        format_info = self._getFormatInfo(format)
+        format_info = Texture3dst._getFormatInfo(format)
         if not format_info["supported"]:
             raise Texture3dstUnsupported(f"'format' is unsupported: {format}, {format_info['name']}")
         
@@ -265,7 +267,7 @@ class Texture3dst:
         
         # Get format info and support
         format = self.header.format
-        format_info = self._getFormatInfo(format)
+        format_info = Texture3dst._getFormatInfo(format)
         if format_info == None:
             raise Texture3dstUnsupported(f"Texture format unsupported: {format}")
         elif not format_info["supported"]:
@@ -337,9 +339,9 @@ class Texture3dst:
             raise Texture3dstException("'mip_level' value greater than supported")
         
         # Verify format and support
-        format_match = self._matchFormat(format.lower())
+        format_match = Texture3dst._matchFormat(format.lower())
         if format_match != None:
-            format_info = self._getFormatInfo(format_match)
+            format_info = Texture3dst._getFormatInfo(format_match)
             if not format_info["supported"]:
                 raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
         else:
@@ -374,7 +376,7 @@ class Texture3dst:
             raise ValueError("y coordinates out of range")
         
         format = self.header.format
-        format_info = self._getFormatInfo(format)
+        format_info = Texture3dst._getFormatInfo(format)
         if len(pixel_data) > format_info["pixel_channels"]:
             raise ValueError(f"Too many values ({len(pixel_data)}) in 'pixel_data' for format: {format}, {format_info['name']}")
         elif len(pixel_data) < format_info["pixel_channels"]:
@@ -423,8 +425,8 @@ class Texture3dst:
         elif y2 <= y1:
             raise ValueError("y2 coordinates must be greater than y1")
         
-        formatInfo = self._getFormatInfo(self.header.format)
-        crop_texture = Texture3dst().new(x2-x1, y2-y1, self.header.mip_level, formatInfo["name"])
+        formatInfo = Texture3dst._getFormatInfo(self.header.format)
+        crop_texture = Texture3dst.new(x2-x1, y2-y1, self.header.mip_level, formatInfo["name"])
         for i in range(y1, y2):
             for j in range(x1, x2):
                 crop_texture.setPixel(j-x1, i-y1, self.getPixel(j, i))
@@ -484,21 +486,20 @@ class Texture3dst:
 
     @staticmethod
     def fromImage(image: Image.Image, format: str = "rgba8") -> Texture3dst:
-        self = Texture3dst()
         assertType("image", image, Image.Image)
         assertType("format", format, str)
 
         # Verify format and support
-        format_match = self._matchFormat(format.lower())
+        format_match = Texture3dst._matchFormat(format.lower())
         if format_match != None:
-            format_info = self._getFormatInfo(format_match)
+            format_info = Texture3dst._getFormatInfo(format_match)
             if not format_info["supported"]:
                 raise Texture3dstUnsupported(f"Texture format unsupported: {format}, '{format_info['name']}'")
         else:
             raise ValueError(f"Texture format invalid: {format}")
         
         img_w, img_h = image.size
-        self.new(img_w, img_h, format=format)
+        self = Texture3dst.new(img_w, img_h, format=format)
         self.pasteImage(image, 0, 0)
         return self
 
@@ -571,7 +572,7 @@ class Texture3dst:
         return copy_data
     
     def _formatPixelData(self, mipmapOpaque: bool) -> bytearray:
-        format_info = self._getFormatInfo(self.header.format)
+        format_info = Texture3dst._getFormatInfo(self.header.format)
         full_width = self.header.full_size.width
         full_height = self.header.full_size.height
 
@@ -605,7 +606,7 @@ class Texture3dst:
         return data
 
     def _processMipLevels(self, data: bytearray, opaque: bool) -> None:
-        format_info = self._getFormatInfo(self.header.format)
+        format_info = Texture3dst._getFormatInfo(self.header.format)
         width = self.header.full_size.width
         height = self.header.full_size.height
         resized_width = width
