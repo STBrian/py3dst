@@ -13,7 +13,7 @@ from pathlib import Path
 from .tex3dst import Texture3dst
 from .error_classes import *
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 
 def convertFile(input_path: Path, output_path: Path, format: str, mip_levels: int, show_unidentified_image: bool, show_tracebacks: bool):
     try:
