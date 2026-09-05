@@ -152,7 +152,9 @@ def main():
             
             root = tkinter.Tk()
             root.title(path.name)
-            root.geometry(f"{texture.size[0]}x{texture.size[1]}")
+            window_width = texture.size[0] if texture.size[0] > 40 else 40
+            window_height = texture.size[1] if texture.size[1] > 40 else 40
+            root.geometry(f"{window_width}x{window_height}")
             image_tk = ImageTk.PhotoImage(image)
             image_label = tkinter.Label(root, image=image_tk)
             image_label.pack(expand=True)
