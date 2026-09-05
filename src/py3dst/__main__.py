@@ -5,7 +5,6 @@
 import argparse
 import sys
 import os
-import tkinter
 import traceback
 from PIL import Image, ImageTk, UnidentifiedImageError
 from glob import iglob
@@ -142,6 +141,7 @@ def main():
     if not args.convert and not args.touch:
         path = Path(args.path)
         if path.exists() and path.is_file():
+            import tkinter
             try:
                 texture = Texture3dst.open(path)
             except Exception as e:
