@@ -19,10 +19,10 @@ def convertFile(input_path: Path, output_path: Path, format: str, mip_levels: in
         texture = Texture3dst.open(input_path)
         try:
             image = texture.cropToImage(0, 0, texture.size[0], texture.size[1])
-            if not output_path.exists():
-                os.makedirs(output_path)
-            image.save(f"{output_path}/{input_path.stem}.png")
-            print("File saved at:", f"{output_path.absolute()}/{input_path.stem}.png")
+            if not output_path.parent.exists():
+                os.makedirs(output_path.parent)
+            image.save(f"{output_path}")
+            print("File saved at:", f"{output_path.absolute()}")
         except Exception as e:
             print("Error: Unable to convert file:", e)
             print(input_path.absolute())
@@ -34,11 +34,11 @@ def convertFile(input_path: Path, output_path: Path, format: str, mip_levels: in
             image = Image.open(input_path)
             try:
                 texture = Texture3dst.fromImage(image, format=format)
-                if not output_path.exists():
-                    os.makedirs(output_path)
+                if not output_path.parent.exists():
+                    os.makedirs(output_path.parent)
                 texture.header.mip_level = mip_levels
-                texture.export(f"{output_path}/{input_path.stem}.3dst")
-                print("File saved at:", f"{output_path.absolute()}/{input_path.stem}.3dst")
+                texture.export(f"{output_path}")
+                print("File saved at:", f"{output_path.absolute()}")
             except Exception as e:
                 print("Error: Unable to convert file:", e)
                 print(input_path.absolute())
@@ -99,7 +99,7 @@ def main():
         "--output", 
         metavar=("OUT"),
         action="store",
-        help="destination directory"
+        help="output file or directory if converting multiple files"
     )
     parser.add_argument(
         "-r", 
@@ -199,8 +199,11 @@ def main():
 
                 for file in input_files:
                     file_path = Path(file)
+                    new_extension = "3dst"
+                    if file_path.suffix == ".3dst":
+                        new_extension = "png"
                     if file_path.is_file():
-                        status_code = convertFile(file_path, output_path, "rgba8", 1, show_unidentified_image=False, show_tracebacks=args.show_tracebacks)
+                        status_code = convertFile(file_path, output_path / f"{file_path.stem}.{new_extension}", "rgba8", 1, show_unidentified_image=False, show_tracebacks=args.show_tracebacks)
                         if status_code and not args.suppress_errors and status_code != 7:
                             return status_code
             else:
