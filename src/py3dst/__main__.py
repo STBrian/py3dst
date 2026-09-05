@@ -5,6 +5,7 @@
 import argparse
 import sys
 import os
+import re
 import traceback
 from PIL import Image, ImageTk, UnidentifiedImageError
 from glob import iglob
@@ -124,6 +125,13 @@ def main():
         default=1,
         help="number of mipmap levels for the output (default: 1)"
     )
+    parser.add_argument( 
+        "--resize", 
+        action="store", 
+        type=str,
+        default="",
+        help="resize the output image (ignored when converting multiple files)"
+    )
     parser.add_argument("-v", "--version", action="version", version=__version__)
 
     args = parser.parse_args()
@@ -183,12 +191,27 @@ def main():
             return 1
     elif args.convert:
         output_path = Path(args.output)
+
+        resize = args.resize
+        if len(args.input) > 1:
+            resize = ""
+            print("Ignoring resize value")
         
         for path in args.input:
             input_path = Path(path)
             if input_path.exists() and input_path.is_file():
                 input_path = Path(path)
                 status_code = convertFile(input_path, output_path, args.format, args.mip_levels, show_unidentified_image=True, show_tracebacks=args.show_tracebacks)
+                if status_code == 0:
+                    if resize != "":
+                        dims = re.search(r"(\d+)x(\d+)", resize)
+                        if dims:
+                            w, h = int(dims.group(1)), int(dims.group(2))
+                            tmp = Image.open(output_path)
+                            tmp = tmp.resize((w, h), Image.Resampling.LANCZOS)
+                            tmp.save(output_path)
+                        else:
+                            print("Error: Resize format is invalid")
                 if not args.suppress_errors and status_code:
                     return status_code
             elif input_path.exists() and input_path.is_dir():
